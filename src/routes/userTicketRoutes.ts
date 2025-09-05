@@ -1,3 +1,4 @@
+// FILE: routes/userTicketRoutes.ts - FIXED
 import express from "express";
 import {
   createUserTicket,
@@ -6,13 +7,14 @@ import {
 } from "../controllers/userTicketController";
 import {
   authenticateJWT,
-  authorizeUser, // Changed from authorizeManager to authorizeUser
+  authorizeRegularUser, // Use strict regular user authorization
 } from "../middlewares/authMiddleware";
 
 const router = express.Router();
 
-router.post("/", authenticateJWT, authorizeUser, createUserTicket); // Changed middleware
-router.get("/", authenticateJWT, authorizeUser, getUserTickets); // Changed middleware
-router.delete("/:id", authenticateJWT, authorizeUser, deleteUserTicket); // Changed middleware
+// STRICT separation - only regular users can access these routes
+router.post("/", authenticateJWT, authorizeRegularUser, createUserTicket);
+router.get("/", authenticateJWT, authorizeRegularUser, getUserTickets);
+router.delete("/:id", authenticateJWT, authorizeRegularUser, deleteUserTicket);
 
 export default router;

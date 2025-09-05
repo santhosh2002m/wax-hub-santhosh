@@ -5,8 +5,7 @@ import jwt from "jsonwebtoken";
 import Counter from "../models/counterModel"; // Use Counter instead of User
 import { userLoginSchema } from "../schemas/userSchema";
 
-// Make sure user login returns proper role information
-// controllers/userAuthController.ts - Update the userLogin function
+// controllers/userAuthController.ts - FIXED userLogin function
 export const userLogin = async (req: Request, res: Response) => {
   try {
     const { error } = userLoginSchema.validate(req.body);
@@ -21,37 +20,69 @@ export const userLogin = async (req: Request, res: Response) => {
 
     const counter = await Counter.findOne({ where: { username } });
 
-    if (
-      !counter ||
-      !bcrypt.compareSync(password, counter.password) ||
-      (counter.role !== "user" && !counter.special) // Allow both user and special counters
-    ) {
+    // FIX: Strict separation - regular users cannot be special and vice versa
+    if (!counter || !bcrypt.compareSync(password, counter.password)) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign(
-      {
-        id: counter.id,
-        username,
+    // FIX: Regular user login - must have role "user" and NOT be special
+    if (!counter.special && counter.role === "user") {
+      const token = jwt.sign(
+        {
+          id: counter.id,
+          username,
+          role: counter.role,
+          special: counter.special,
+          userType: "regular", // Add explicit user type
+        },
+        process.env.JWT_SECRET as string,
+        { expiresIn: "8h" }
+      );
+
+      return res.status(200).json({
+        token,
+        username: counter.username,
         role: counter.role,
         special: counter.special,
-      },
-      process.env.JWT_SECRET as string,
-      { expiresIn: "8h" }
-    );
+        userType: "regular",
+        createdAt: counter.createdAt,
+      });
+    }
 
-    res.status(200).json({
-      token,
-      username: counter.username,
-      role: counter.role,
-      special: counter.special,
-      createdAt: counter.createdAt,
-    });
+    // FIX: Special user login - must have special flag
+    if (counter.special) {
+      const token = jwt.sign(
+        {
+          id: counter.id,
+          username,
+          role: counter.role,
+          special: counter.special,
+          userType: "special", // Add explicit user type
+        },
+        process.env.JWT_SECRET as string,
+        { expiresIn: "8h" }
+      );
+
+      return res.status(200).json({
+        token,
+        username: counter.username,
+        role: counter.role,
+        special: counter.special,
+        userType: "special",
+        createdAt: counter.createdAt,
+      });
+    }
+
+    // If neither regular user nor special user
+    return res
+      .status(401)
+      .json({ message: "Invalid credentials for user dashboard" });
   } catch (error) {
     console.error("Error in user login:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 export const userRegister = async (req: Request, res: Response) => {
   try {
     const { error } = userLoginSchema.validate(req.body); // Reuse login schema for simplicity

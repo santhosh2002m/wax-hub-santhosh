@@ -10,14 +10,14 @@ import {
 import {
   authenticateJWT,
   authorizeAdmin,
-  authorizeAdminOrManager, // Changed from authorizeAdminOrUser to authorizeAdminOrManager
+  authorizeForGuides, // Use the new authorization
 } from "../middlewares/authMiddleware";
 
 const router = express.Router();
 
-router.get("/", authenticateJWT, authorizeAdminOrManager, getUserGuides); // Updated middleware
-router.get("/top", authenticateJWT, authorizeAdminOrManager, getTopPerformers); // Updated middleware
-router.get("/:id", authenticateJWT, authorizeAdminOrManager, getUserGuide); // Updated middleware
+router.get("/", authenticateJWT, authorizeForGuides, getUserGuides);
+router.get("/top", authenticateJWT, authorizeForGuides, getTopPerformers);
+router.get("/:id", authenticateJWT, authorizeForGuides, getUserGuide);
 router.post("/", authenticateJWT, authorizeAdmin, createUserGuide);
 router.put("/:id", authenticateJWT, authorizeAdmin, updateUserGuide);
 router.delete("/:id", authenticateJWT, authorizeAdmin, deleteUserGuide);

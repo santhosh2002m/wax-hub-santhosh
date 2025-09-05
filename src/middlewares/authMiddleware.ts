@@ -9,6 +9,50 @@ interface AuthenticatedUser {
   special?: boolean;
 }
 
+// Add this new authorization function
+export const authorizeForGuides = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const user = (req as any).user as AuthenticatedUser;
+  // Allow regular users, managers, admins, and special users to access guides
+  if (
+    user.role === "user" ||
+    user.role === "manager" ||
+    user.role === "admin" ||
+    user.special
+  ) {
+    return next();
+  }
+  return res.status(403).json({ message: "Access to guides denied" });
+};
+
+export const authorizeRegularUser = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const user = (req as any).user as AuthenticatedUser;
+  if (user.role === "user" && !user.special) {
+    return next();
+  }
+  return res.status(403).json({ message: "Regular user access required" });
+};
+
+// Strict special user authorization (only special users)
+export const authorizeSpecialUser = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const user = (req as any).user as AuthenticatedUser;
+  if (user.special) {
+    return next();
+  }
+  return res.status(403).json({ message: "Special user access required" });
+};
+
 export const authenticateJWT = (
   req: Request,
   res: Response,
@@ -63,12 +107,11 @@ export const authorizeUser = (
   next: NextFunction
 ) => {
   const user = (req as any).user as AuthenticatedUser;
-  if (user.role !== "user" && user.role !== "admin" && !user.special) {
-    return res
-      .status(403)
-      .json({ message: "User, admin, or special counter access required" });
+  // Allow only regular users (not special) or admins
+  if ((user.role === "user" && !user.special) || user.role === "admin") {
+    return next();
   }
-  next();
+  return res.status(403).json({ message: "User or admin access required" });
 };
 
 export const authorizeAdminOrUser = (

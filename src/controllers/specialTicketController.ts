@@ -106,7 +106,7 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
   }
 };
 
-// FILE: controllers/specialTicketController.ts (update getSpecialTickets function)
+// FILE: controllers/specialTicketController.ts - ENHANCE getSpecialTickets function
 export const getSpecialTickets = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user as AuthenticatedUser;
@@ -116,13 +116,20 @@ export const getSpecialTickets = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Counter not found" });
     }
 
-    // Allow special counters, admins, and managers to view special tickets
-    if (!counter.special && user.role !== "admin" && user.role !== "manager") {
+    // FIX: Special users can only view their own tickets
+    let whereClause: any = {};
+
+    if (counter.special) {
+      // Special user - only their own tickets
+      whereClause.counter_id = user.id;
+    } else if (user.role !== "admin" && user.role !== "manager") {
+      // Regular users cannot access special tickets at all
       return res.status(403).json({
         message: "Access denied: Special counter, admin, or manager required",
       });
     }
 
+    // ... rest of the function remains the same but uses the updated whereClause
     const { startDate, endDate, search, page = "1", limit = "10" } = req.query;
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
@@ -135,16 +142,9 @@ export const getSpecialTickets = async (req: Request, res: Response) => {
     const endOfToday = new Date(today);
     endOfToday.setHours(23, 59, 59, 999);
 
-    let whereClause: any = {
-      createdAt: {
-        [Op.between]: [startOfToday, endOfToday],
-      },
+    whereClause.createdAt = {
+      [Op.between]: [startOfToday, endOfToday],
     };
-
-    // For special counters, only show their own tickets
-    if (counter.special && user.role !== "admin") {
-      whereClause.counter_id = user.id;
-    }
 
     // If date range is provided (for admin viewing historical data)
     if (startDate && endDate) {

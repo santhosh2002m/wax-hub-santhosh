@@ -1,4 +1,4 @@
-// routes/specialTicketRoutes.ts
+// FILE: routes/specialTicketRoutes.ts - FIXED
 import express from "express";
 import {
   createSpecialTicket,
@@ -7,18 +7,23 @@ import {
 } from "../controllers/specialTicketController";
 import {
   authenticateJWT,
-  authorizeSpecialCounter,
-  authorizeAdminOrManager, // Changed from authorizeAdminOrManager to allow managers
+  authorizeSpecialUser, // Use strict special user authorization
+  authorizeAdminOrManager,
 } from "../middlewares/authMiddleware";
 
 const router = express.Router();
 
-router.post("/", authenticateJWT, authorizeSpecialCounter, createSpecialTicket);
-router.get("/", authenticateJWT, authorizeAdminOrManager, getSpecialTickets); // Changed to allow managers
+// STRICT separation - only special users can create special tickets
+router.post("/", authenticateJWT, authorizeSpecialUser, createSpecialTicket);
+
+// Admin/manager can view, but special users can only view their own (handled in controller)
+router.get("/", authenticateJWT, authorizeAdminOrManager, getSpecialTickets);
+
+// Special users can delete their own, admins can delete any
 router.delete(
   "/:id",
   authenticateJWT,
-  authorizeAdminOrManager, // Changed to allow managers
+  authorizeAdminOrManager,
   deleteSpecialTicket
 );
 
