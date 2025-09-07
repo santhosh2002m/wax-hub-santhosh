@@ -17,25 +17,40 @@ export class InvoiceNumberGenerator {
     let nextNumber: number;
 
     if (isSpecial) {
-      // Special invoices continue from last user invoice count
-      nextNumber = counter.last_user_invoice + 1;
-      await counter.update({ last_special_invoice: nextNumber });
-    } else {
-      // User invoices continue from combined count
-      const combinedLast = Math.max(
+      // Special invoices continue from the global sequence
+      const globalLast = Math.max(
         counter.last_user_invoice,
         counter.last_special_invoice
       );
-      nextNumber = combinedLast + 1;
+      nextNumber = globalLast + 1;
+      await counter.update({ last_special_invoice: nextNumber });
+    } else {
+      // User invoices continue from the global sequence
+      const globalLast = Math.max(
+        counter.last_user_invoice,
+        counter.last_special_invoice
+      );
+      nextNumber = globalLast + 1;
       await counter.update({ last_user_invoice: nextNumber });
     }
 
     return nextNumber;
   }
 
-  static async getCurrentUserInvoiceCount(): Promise<number> {
+  static async getAdminInvoiceNumber(): Promise<number> {
     const counter = await InvoiceCounter.findOne();
-    return counter ? counter.last_user_invoice : 0;
+    if (!counter) return 1;
+
+    // Admin dashboard only counts user invoices sequentially
+    return counter.last_user_invoice + 1;
+  }
+
+  static async getCurrentCounts(): Promise<{ user: number; special: number }> {
+    const counter = await InvoiceCounter.findOne();
+    return {
+      user: counter ? counter.last_user_invoice : 0,
+      special: counter ? counter.last_special_invoice : 0,
+    };
   }
 
   static async resetCounters(): Promise<void> {

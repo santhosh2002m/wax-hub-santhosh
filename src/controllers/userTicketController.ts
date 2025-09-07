@@ -1,4 +1,3 @@
-// FILE: controllers/userTicketController.ts
 import { Request, Response } from "express";
 import UserTicket from "../models/userticketModel";
 import { userTicketSchema } from "../schemas/userSchema";
@@ -7,7 +6,6 @@ import Ticket from "../models/ticketModel";
 import Transaction from "../models/transactionModel";
 import Counter from "../models/counterModel";
 import UserGuide from "../models/userGuideModel";
-import { v4 as uuidv4 } from "uuid";
 import { InvoiceNumberGenerator } from "../utils/invoiceNumberGenerator";
 
 interface AuthenticatedUser {
@@ -25,7 +23,6 @@ const calculateGuideRating = (totalBookings: number): number => {
 };
 
 // Helper function to update guide stats or create guide if not exists
-// FILE: controllers/userTicketController.ts - Update the updateGuideStats function
 const updateGuideStats = async (
   guide_name: string,
   guide_number: string,
@@ -108,35 +105,6 @@ const updateGuideStats = async (
   }
 };
 
-const generateUniqueInvoiceNo = async (
-  prefix: string = "TKT"
-): Promise<string> => {
-  let invoiceNo: string;
-  let isUnique = false;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (!isUnique && attempts < maxAttempts) {
-    invoiceNo = `${prefix}${uuidv4().slice(0, 8).toUpperCase()}`;
-
-    // Check if invoice number already exists
-    const existingTicket = await UserTicket.findOne({
-      where: { invoice_no: invoiceNo },
-    });
-
-    if (!existingTicket) {
-      isUnique = true;
-      return invoiceNo;
-    }
-
-    attempts++;
-  }
-
-  // Fallback: use timestamp if UUID collision occurs (extremely rare)
-  return `${prefix}${Date.now().toString().slice(-8)}`;
-};
-
-// FILE: controllers/userTicketController.ts - Update the createUserTicket function
 export const createUserTicket = async (req: Request, res: Response) => {
   const transaction = await UserTicket.sequelize!.transaction();
 
@@ -175,7 +143,7 @@ export const createUserTicket = async (req: Request, res: Response) => {
     const invoiceNumber = await InvoiceNumberGenerator.getNextInvoiceNumber(
       false
     );
-    const invoice_no = `TKT${invoiceNumber.toString().padStart(6, "0")}`;
+    const invoice_no = invoiceNumber.toString().padStart(2, "0"); // 2-digit format
 
     // Set default values for optional fields
     const ticketData = {
@@ -302,7 +270,6 @@ export const createUserTicket = async (req: Request, res: Response) => {
   }
 };
 
-// FILE: controllers/userTicketController.ts (update getUserTickets function)
 export const getUserTickets = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user as {

@@ -1,4 +1,3 @@
-// FILE: controllers/specialTicketController.ts
 import { Request, Response } from "express";
 import SpecialTicket from "../models/SpecialTicket";
 import { userTicketSchema } from "../schemas/userSchema";
@@ -6,7 +5,6 @@ import { Op } from "sequelize";
 import Ticket from "../models/ticketModel";
 import Transaction from "../models/transactionModel";
 import Counter from "../models/counterModel";
-import { v4 as uuidv4 } from "uuid";
 import { InvoiceNumberGenerator } from "../utils/invoiceNumberGenerator";
 
 interface AuthenticatedUser {
@@ -16,7 +14,6 @@ interface AuthenticatedUser {
   special?: boolean;
 }
 
-// FILE: controllers/specialTicketController.ts - Update the createSpecialTicket function
 export const createSpecialTicket = async (req: Request, res: Response) => {
   try {
     const { error } = userTicketSchema.validate(req.body, {
@@ -50,7 +47,7 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
     const invoiceNumber = await InvoiceNumberGenerator.getNextInvoiceNumber(
       true
     );
-    const invoice_no = `SPT${invoiceNumber.toString().padStart(6, "0")}`;
+    const invoice_no = invoiceNumber.toString().padStart(2, "0"); // 2-digit format
 
     // Set default values for optional fields
     const ticketData: any = {
@@ -100,7 +97,7 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-// FILE: controllers/specialTicketController.ts - ENHANCE getSpecialTickets function
+
 export const getSpecialTickets = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user as AuthenticatedUser;
@@ -123,7 +120,6 @@ export const getSpecialTickets = async (req: Request, res: Response) => {
       });
     }
 
-    // ... rest of the function remains the same but uses the updated whereClause
     const { startDate, endDate, search, page = "1", limit = "10" } = req.query;
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
