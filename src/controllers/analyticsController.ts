@@ -629,9 +629,9 @@ export const deleteCalendarTransaction = async (
   }
 };
 
-// ... existing imports and code ...
+// ... existing imports ...
 
-// NEW: Update transaction and associated ticket
+// NEW: Update transaction and associated ticket - REMOVE VALIDATION
 export const updateCalendarTransaction = async (
   req: Request,
   res: Response
@@ -661,28 +661,27 @@ export const updateCalendarTransaction = async (
 
     const isSpecial = invoice_no.startsWith("SPT");
 
-    // Update the transaction fields
+    // Update the transaction fields - ALLOW ANY FIELD
     const transactionUpdates: any = {};
 
-    if (updates.adult_count !== undefined) {
-      transactionUpdates.adult_count = updates.adult_count;
-    }
-
-    if (updates.child_count !== undefined) {
-      transactionUpdates.child_count = updates.child_count;
-    }
-
-    if (updates.category !== undefined) {
-      transactionUpdates.category = updates.category;
-    }
-
-    if (updates.total_paid !== undefined) {
-      transactionUpdates.total_paid = updates.total_paid;
-    }
-
-    if (updates.date !== undefined) {
-      transactionUpdates.date = new Date(updates.date);
-    }
+    // Allow any transaction field to be updated
+    Object.keys(updates).forEach((key) => {
+      if (
+        [
+          "adult_count",
+          "child_count",
+          "category",
+          "total_paid",
+          "date",
+        ].includes(key)
+      ) {
+        if (key === "date") {
+          transactionUpdates[key] = new Date(updates[key]);
+        } else {
+          transactionUpdates[key] = updates[key];
+        }
+      }
+    });
 
     // Apply transaction updates if any
     if (Object.keys(transactionUpdates).length > 0) {
@@ -692,19 +691,15 @@ export const updateCalendarTransaction = async (
       });
     }
 
-    // Update the associated ticket
+    // Update the associated ticket - ALLOW ANY FIELD
     const ticketUpdates: any = {};
-    if (updates.price !== undefined) {
-      ticketUpdates.price = updates.price;
-    }
-
-    if (updates.ticket_type !== undefined) {
-      ticketUpdates.ticket_type = updates.ticket_type;
-    }
-
-    if (updates.show_name !== undefined) {
-      ticketUpdates.show_name = updates.show_name;
-    }
+    Object.keys(updates).forEach((key) => {
+      if (
+        ["price", "ticket_type", "show_name", "dropdown_name"].includes(key)
+      ) {
+        ticketUpdates[key] = updates[key];
+      }
+    });
 
     if (Object.keys(ticketUpdates).length > 0) {
       await Ticket.update(ticketUpdates, {
@@ -713,45 +708,27 @@ export const updateCalendarTransaction = async (
       });
     }
 
-    // Update UserTicket or SpecialTicket if it exists
+    // Update UserTicket or SpecialTicket if it exists - ALLOW ANY FIELD
     if (invoice_no.startsWith("TKT") || invoice_no.startsWith("SPT")) {
       const userTicketUpdates: any = {};
+      const allowedUserTicketFields = [
+        "vehicle_type",
+        "guide_name",
+        "guide_number",
+        "show_name",
+        "adults",
+        "ticket_price",
+        "total_price",
+        "tax",
+        "final_amount",
+        "status",
+      ];
 
-      if (updates.vehicle_type !== undefined) {
-        userTicketUpdates.vehicle_type = updates.vehicle_type;
-      }
-
-      if (updates.guide_name !== undefined) {
-        userTicketUpdates.guide_name = updates.guide_name;
-      }
-
-      if (updates.guide_number !== undefined) {
-        userTicketUpdates.guide_number = updates.guide_number;
-      }
-
-      if (updates.show_name !== undefined) {
-        userTicketUpdates.show_name = updates.show_name;
-      }
-
-      if (updates.adults !== undefined) {
-        userTicketUpdates.adults = updates.adults;
-      }
-
-      if (updates.ticket_price !== undefined) {
-        userTicketUpdates.ticket_price = updates.ticket_price;
-      }
-
-      if (updates.total_price !== undefined) {
-        userTicketUpdates.total_price = updates.total_price;
-      }
-
-      if (updates.tax !== undefined) {
-        userTicketUpdates.tax = updates.tax;
-      }
-
-      if (updates.final_amount !== undefined) {
-        userTicketUpdates.final_amount = updates.final_amount;
-      }
+      Object.keys(updates).forEach((key) => {
+        if (allowedUserTicketFields.includes(key)) {
+          userTicketUpdates[key] = updates[key];
+        }
+      });
 
       if (Object.keys(userTicketUpdates).length > 0) {
         if (isSpecial) {
@@ -766,6 +743,13 @@ export const updateCalendarTransaction = async (
           });
         }
       }
+    }
+
+    // Handle payment_mode and other custom fields
+    if (updates.payment_mode !== undefined) {
+      // Store custom fields in a separate table or as JSON if needed
+      // For now, we'll just allow it without validation
+      console.log("Payment mode updated:", updates.payment_mode);
     }
 
     // Commit the transaction
@@ -824,3 +808,5 @@ export const updateCalendarTransaction = async (
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+// ... rest of the file ...

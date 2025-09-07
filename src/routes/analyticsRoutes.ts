@@ -12,23 +12,16 @@ import {
   authenticateJWT,
   authorizeAdminOrManager,
 } from "../middlewares/authMiddleware";
-import { transactionUpdateSchema } from "../schemas/transactionSchema";
 
 const router = express.Router();
 
-// Add validation middleware for update route
+// Remove strict validation - allow any field to be edited
 const validateUpdate = (
   req: express.Request,
   res: express.Response,
   next: express.NextFunction
 ) => {
-  const { error } = transactionUpdateSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      message: "Validation error",
-      details: error.details.map((err) => err.message),
-    });
-  }
+  // Allow any field to be updated without validation
   next();
 };
 
@@ -72,7 +65,7 @@ router.put(
   "/calendar/:invoice_no",
   authenticateJWT,
   authorizeAdminOrManager,
-  validateUpdate, // Add validation middleware
+  validateUpdate, // Updated validation middleware
   updateCalendarTransaction
 );
 

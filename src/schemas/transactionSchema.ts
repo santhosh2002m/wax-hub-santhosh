@@ -19,7 +19,8 @@ export const transactionSchema = Joi.object({
   final_amount: Joi.number().min(0).optional(),
   price: Joi.number().min(0).optional(),
   ticket_type: Joi.string().optional(),
-});
+  // Allow any other fields without validation
+}).unknown(true);
 
 export const transactionUpdateSchema = Joi.object({
   adult_count: Joi.number().integer().min(0).optional(),
@@ -40,4 +41,7 @@ export const transactionUpdateSchema = Joi.object({
   final_amount: Joi.number().min(0).optional(),
   price: Joi.number().min(0).optional(),
   ticket_type: Joi.string().optional(),
-}).min(1);
+  // Allow any other fields without validation
+})
+  .unknown(true)
+  .min(1);
