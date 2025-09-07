@@ -1,4 +1,4 @@
-// FILE: app.ts (updated)
+// FILE: app.ts (updated for HTTPS with IP address)
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -27,8 +27,18 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(helmet());
-app.use(cors());
+app.use(
+  helmet({
+    // Disable content security policy for development
+    contentSecurityPolicy: false,
+  })
+);
+app.use(
+  cors({
+    origin: ["https://68.178.168.156:3000", "http://localhost:3000"], // Add your frontend URLs
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(morgan("dev"));
 
@@ -44,6 +54,11 @@ app.use("/api/user/guides", userGuideRoutes);
 app.use("/api/special/tickets", specialTicketRoutes);
 app.use("/api/user/auth", userAuthRoutes);
 app.use("/api/twilio", twilioRoutes);
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK", message: "Server is running" });
+});
 
 // Database sync and special counter creation
 sequelize
@@ -79,25 +94,27 @@ app.use(
 
 const PORT = process.env.PORT || 3000;
 
-// HTTPS configuration
-const sslOptions = {
-  key: fs.readFileSync(path.join(__dirname, "../ssl/private.key")), // Path to your private key
-  cert: fs.readFileSync(path.join(__dirname, "../ssl/certificate.crt")), // Path to your certificate
-  ca: fs.readFileSync(path.join(__dirname, "../ssl/ca_bundle.crt")), // Path to your CA bundle (if needed)
+// HTTPS configuration with self-signed certificate
+const httpsOptions = {
+  key: fs.readFileSync(path.join(__dirname, "ssl", "key.pem")),
+  cert: fs.readFileSync(path.join(__dirname, "ssl", "cert.pem")),
+  // Allow self-signed certificates
+  rejectUnauthorized: false,
 };
 
 // Create HTTPS server
-https.createServer(sslOptions, app).listen(PORT, () => {
-  console.log(`HTTPS Server running on port ${PORT}`);
+https.createServer(httpsOptions, app).listen(PORT, () => {
+  console.log(`HTTPS Server running on https://68.178.168.156:${PORT}`);
 });
 
-// Also create HTTP server for redirection (optional)
+// Optional: Also create HTTP server that redirects to HTTPS
 import http from "http";
 const HTTP_PORT = 3001;
 
 http
   .createServer((req, res) => {
-    res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` });
+    const httpsUrl = `https://68.178.168.156:${PORT}${req.url}`;
+    res.writeHead(301, { Location: httpsUrl });
     res.end();
   })
   .listen(HTTP_PORT, () => {
