@@ -39,6 +39,9 @@ app.use(
       "http://localhost:3000", // local frontend dev
       "http://localhost:8080", // Vite default
       "http://localhost:8081", // fallback Vite port
+      "http://localhost:8082",
+      "https://thermosandmuseum.icu",
+      "https://admin.thermosandmuseum.icu",
     ],
     credentials: true,
   })
