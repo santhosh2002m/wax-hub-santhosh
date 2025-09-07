@@ -1,4 +1,4 @@
-// FILE: app.ts (updated for HTTPS with IP address)
+// FILE: app.ts (updated for HTTPS with IP address and full CORS setup)
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -21,6 +21,7 @@ import userAuthRoutes from "./routes/userAuthRoutes";
 import { createSpecialCounter } from "./controllers/counterController";
 import twilioRoutes from "./routes/twilioRoutes";
 import { scheduleDailyCleanup, cleanupOldTickets } from "./utils/dailyCleanup";
+import http from "http";
 
 dotenv.config();
 
@@ -35,7 +36,13 @@ app.use(
 );
 app.use(
   cors({
-    origin: ["https://68.178.168.156:3000", "http://localhost:3000"], // Add your frontend URLs
+    origin: [
+      "https://68.178.168.156:3000", // frontend deployed over HTTPS
+      "http://68.178.168.156:3000", // allow HTTP too
+      "http://localhost:3000", // local frontend
+      "http://localhost:8080", // Vite default
+      "http://localhost:8081", // fallback Vite port
+    ],
     credentials: true,
   })
 );
@@ -100,13 +107,13 @@ const httpsOptions = {
   cert: fs.readFileSync(path.join(__dirname, "..", "ssl", "cert.pem")),
   rejectUnauthorized: false,
 };
+
 // Create HTTPS server
 https.createServer(httpsOptions, app).listen(PORT, () => {
   console.log(`HTTPS Server running on https://68.178.168.156:${PORT}`);
 });
 
 // Optional: Also create HTTP server that redirects to HTTPS
-import http from "http";
 const HTTP_PORT = 3001;
 
 http
