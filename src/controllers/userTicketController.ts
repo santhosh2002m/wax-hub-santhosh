@@ -24,6 +24,7 @@ const calculateGuideRating = (totalBookings: number): number => {
 };
 
 // Helper function to update guide stats or create guide if not exists
+// FILE: controllers/userTicketController.ts - Update the updateGuideStats function
 const updateGuideStats = async (
   guide_name: string,
   guide_number: string,
@@ -134,6 +135,7 @@ const generateUniqueInvoiceNo = async (
   return `${prefix}${Date.now().toString().slice(-8)}`;
 };
 
+// FILE: controllers/userTicketController.ts - Update the createUserTicket function
 export const createUserTicket = async (req: Request, res: Response) => {
   const transaction = await UserTicket.sequelize!.transaction();
 
@@ -171,12 +173,16 @@ export const createUserTicket = async (req: Request, res: Response) => {
     // Generate unique invoice number
     const invoice_no = await generateUniqueInvoiceNo();
 
+    // Set default values for optional fields
     const ticketData = {
       ...req.body,
       invoice_no,
       user_id: user.id,
       counter_id: user.id,
       status: "completed" as const,
+      vehicle_type: req.body.vehicle_type || "N/A",
+      guide_name: req.body.guide_name || "N/A",
+      guide_number: req.body.guide_number || "N/A",
     };
 
     // DEBUG: Log the incoming data
@@ -185,7 +191,7 @@ export const createUserTicket = async (req: Request, res: Response) => {
       guide_number: ticketData.guide_number,
       vehicle_type: ticketData.vehicle_type,
       adults: ticketData.adults,
-      has_guide: !!ticketData.guide_name && ticketData.guide_name !== "N/A",
+      has_guide: ticketData.guide_name && ticketData.guide_name !== "N/A",
     });
 
     // Create all related records within a transaction
@@ -217,8 +223,7 @@ export const createUserTicket = async (req: Request, res: Response) => {
       { transaction }
     );
 
-    // CRITICAL FIX: Update guide stats - this should happen AFTER ticket creation
-    // Remove the validation check - let the updateGuideStats function handle validation
+    // CRITICAL FIX: Update guide stats - only if guide name is provided and not "N/A"
     if (ticketData.guide_name && ticketData.guide_name !== "N/A") {
       try {
         console.log(

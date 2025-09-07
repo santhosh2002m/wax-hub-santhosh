@@ -15,6 +15,7 @@ interface AuthenticatedUser {
   special?: boolean;
 }
 
+// FILE: controllers/specialTicketController.ts - Update the createSpecialTicket function
 export const createSpecialTicket = async (req: Request, res: Response) => {
   try {
     const { error } = userTicketSchema.validate(req.body, {
@@ -49,27 +50,20 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
     };
 
     const invoice_no = await generateInvoiceNo();
+
+    // Set default values for optional fields
     const ticketData: any = {
       ...req.body,
       invoice_no,
       counter_id: user.id,
       status: "completed" as const,
+      vehicle_type: req.body.vehicle_type || "N/A",
+      guide_name: req.body.guide_name || "N/A",
+      guide_number: req.body.guide_number || "N/A",
     };
 
     // FIX: Only create the SpecialTicket, DO NOT create admin dashboard Ticket
     const ticket = await SpecialTicket.create(ticketData);
-
-    // FIX: Also skip creating Transaction record since it references the admin Ticket
-    // await Transaction.create({
-    //   invoice_no: ticket.invoice_no,
-    //   date: new Date(),
-    //   adult_count: ticketData.adults || 0,
-    //   child_count: 0,
-    //   category: "Special",
-    //   total_paid: ticketData.final_amount || 0,
-    //   ticket_id: adminTicket.id, // This would reference the admin ticket
-    //   counter_id: user.id,
-    // });
 
     res.status(201).json({
       message: "Special ticket created successfully",

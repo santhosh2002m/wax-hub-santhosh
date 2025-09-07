@@ -28,37 +28,36 @@ export const userRegisterSchema = Joi.object({
 });
 
 export const userTicketSchema = Joi.object({
-  vehicle_type: Joi.string().allow("", null).optional().messages({
-    "string.empty": "Vehicle type cannot be empty", // Won't trigger due to allow("")
+  vehicle_type: Joi.string().allow("", null).optional().default("N/A"),
+  guide_name: Joi.string().allow("", null).optional().default("N/A"),
+  guide_number: Joi.string().allow("", null).optional().default("N/A"),
+  show_name: Joi.string().required().messages({
+    "string.empty": "Show name is required",
   }),
-  guide_name: Joi.string().allow("", null).optional().messages({
-    "string.empty": "Guide name cannot be empty", // Won't trigger due to allow("")
-  }),
-  guide_number: Joi.string().allow("", null).optional().messages({
-    "string.empty": "Guide number cannot be empty", // Won't trigger due to allow("")
-  }),
-  show_name: Joi.string().allow("", null).optional().messages({
-    "string.empty": "Show name cannot be empty", // Won't trigger due to allow("")
-  }),
-  adults: Joi.number().integer().min(0).allow(null).optional().messages({
+  adults: Joi.number().integer().min(1).required().messages({
     "number.base": "Adults must be a number",
     "number.integer": "Adults must be an integer",
-    "number.min": "Adults cannot be negative",
+    "number.min": "At least 1 adult is required",
+    "any.required": "Number of adults is required",
   }),
-  ticket_price: Joi.number().min(0).allow(null).optional().messages({
+  ticket_price: Joi.number().min(0).required().messages({
     "number.base": "Ticket price must be a number",
     "number.min": "Ticket price cannot be negative",
+    "any.required": "Ticket price is required",
   }),
-  total_price: Joi.number().min(0).allow(null).optional().messages({
+  total_price: Joi.number().min(0).required().messages({
     "number.base": "Total price must be a number",
     "number.min": "Total price cannot be negative",
+    "any.required": "Total price is required",
   }),
-  tax: Joi.number().min(0).allow(null).optional().messages({
+  tax: Joi.number().min(0).required().messages({
     "number.base": "Tax must be a number",
     "number.min": "Tax cannot be negative",
+    "any.required": "Tax is required",
   }),
-  final_amount: Joi.number().min(0).allow(null).optional().messages({
+  final_amount: Joi.number().min(0).required().messages({
     "number.base": "Final amount must be a number",
     "number.min": "Final amount cannot be negative",
+    "any.required": "Final amount is required",
   }),
 });
