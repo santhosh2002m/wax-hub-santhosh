@@ -2,15 +2,14 @@
   "name": "wax-museum-backend",
   "version": "1.0.0",
   "main": "src/app.ts",
-"scripts": {
-  "dev": "nodemon --exec ts-node src/app.ts",
-  "build": "tsc",
-  "start": "node dist/app.js",
-  "setup": "ts-node src/scripts/setup.ts",
-  "migrate": "ts-node src/migrations/run-migrations.ts",
-  "migrate:down": "ts-node src/migrations/rollbackMigration.ts"
-}
-,
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "setup": "ts-node src/scripts/setup.ts",
+    "migrate": "ts-node src/migrations/run-migrations.ts",
+    "migrate:down": "ts-node src/migrations/rollbackMigration.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -20,7 +19,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
+    "fs": "^0.0.1-security",
     "helmet": "^8.1.0",
+    "https": "^1.0.0",
     "joi": "^17.11.0",
     "jsonwebtoken": "^9.0.2",
     "luxon": "^3.7.1",

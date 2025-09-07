@@ -1,13 +1,17 @@
+// FILE: app.ts (updated)
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
 import helmet from "helmet";
+import https from "https";
+import fs from "fs";
+import path from "path";
 import sequelize from "./config/database";
 import counterRoutes from "./routes/counterRoutes";
 import authRoutes from "./routes/authRoutes";
 import ticketRoutes from "./routes/ticketRoutes";
-import guideRoutes from "./routes/guideRoutes"; // Add this import
+import guideRoutes from "./routes/guideRoutes";
 import analyticsRoutes from "./routes/analyticsRoutes";
 import messageRoutes from "./routes/messageRoutes";
 import userTicketRoutes from "./routes/userTicketRoutes";
@@ -32,31 +36,23 @@ app.use(morgan("dev"));
 app.use("/api/auth", authRoutes);
 app.use("/api/counters", counterRoutes);
 app.use("/api/tickets", ticketRoutes);
-app.use("/api/guides", guideRoutes); // Add this line to register /api/guides
+app.use("/api/guides", guideRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/user/tickets", userTicketRoutes);
 app.use("/api/user/guides", userGuideRoutes);
 app.use("/api/special/tickets", specialTicketRoutes);
 app.use("/api/user/auth", userAuthRoutes);
-// Add this import
-
-// Add this route registration (after other routes)
 app.use("/api/twilio", twilioRoutes);
-// Database sync and special counter creation
-// FILE: app.ts (add this after database sync)
 
-// Add this after database sync
+// Database sync and special counter creation
 sequelize
   .sync({ alter: true })
   .then(async () => {
     console.log("Database synced");
-    await createSpecialCounter(); // Create special counter on startup
-
-    // Schedule daily cleanup
+    await createSpecialCounter();
     scheduleDailyCleanup();
 
-    // Also run cleanup on startup to clear any old tickets
     setTimeout(async () => {
       try {
         await cleanupOldTickets();
@@ -64,7 +60,7 @@ sequelize
       } catch (error) {
         console.error("Initial cleanup failed:", error);
       }
-    }, 5000); // Wait 5 seconds after startup
+    }, 5000);
   })
   .catch((err) => console.error("Database sync error:", err));
 
@@ -82,4 +78,28 @@ app.use(
 );
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// HTTPS configuration
+const sslOptions = {
+  key: fs.readFileSync(path.join(__dirname, "../ssl/private.key")), // Path to your private key
+  cert: fs.readFileSync(path.join(__dirname, "../ssl/certificate.crt")), // Path to your certificate
+  ca: fs.readFileSync(path.join(__dirname, "../ssl/ca_bundle.crt")), // Path to your CA bundle (if needed)
+};
+
+// Create HTTPS server
+https.createServer(sslOptions, app).listen(PORT, () => {
+  console.log(`HTTPS Server running on port ${PORT}`);
+});
+
+// Also create HTTP server for redirection (optional)
+import http from "http";
+const HTTP_PORT = 3001;
+
+http
+  .createServer((req, res) => {
+    res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` });
+    res.end();
+  })
+  .listen(HTTP_PORT, () => {
+    console.log(`HTTP redirect server running on port ${HTTP_PORT}`);
+  });
