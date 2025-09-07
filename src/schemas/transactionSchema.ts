@@ -1,5 +1,3 @@
-// ===== FILE: schemas/transactionSchema.ts =====
-// src/schemas/transactionSchema.ts
 import Joi from "joi";
 
 export const transactionSchema = Joi.object({
@@ -9,7 +7,7 @@ export const transactionSchema = Joi.object({
     .valid("Adult", "Child", "Senior", "Group", "Special", "Other")
     .optional(),
   total_paid: Joi.number().positive().optional(),
-  show_name: Joi.string().optional(), // Allow updating show_name via ticket
+  show_name: Joi.string().optional(),
   date: Joi.date().optional(),
   vehicle_type: Joi.string().optional(),
   guide_name: Joi.string().optional(),
@@ -20,6 +18,7 @@ export const transactionSchema = Joi.object({
   tax: Joi.number().min(0).optional(),
   final_amount: Joi.number().min(0).optional(),
   price: Joi.number().min(0).optional(),
+  ticket_type: Joi.string().optional(),
 });
 
 export const transactionUpdateSchema = Joi.object({
@@ -40,4 +39,5 @@ export const transactionUpdateSchema = Joi.object({
   tax: Joi.number().min(0).optional(),
   final_amount: Joi.number().min(0).optional(),
   price: Joi.number().min(0).optional(),
+  ticket_type: Joi.string().optional(),
 }).min(1);

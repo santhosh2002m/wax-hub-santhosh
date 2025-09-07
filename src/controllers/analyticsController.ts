@@ -629,51 +629,67 @@ export const deleteCalendarTransaction = async (
   }
 };
 
+// ... existing imports and code ...
+
 // NEW: Update transaction and associated ticket
-// FILE: controllers/analyticsController.ts (update the updateCalendarTransaction function)
 export const updateCalendarTransaction = async (
   req: Request,
   res: Response
 ) => {
+  const transaction = await Transaction.sequelize!.transaction();
+
   try {
     const { invoice_no } = req.params;
     const updates = req.body;
 
     if (!invoice_no) {
+      await transaction.rollback();
       return res.status(400).json({ message: "Invoice number is required" });
     }
 
     // Find the transaction
-    const transaction = await Transaction.findOne({
+    const transactionRecord = await Transaction.findOne({
       where: { invoice_no },
       include: [{ model: Ticket, as: "ticket" }],
+      transaction,
     });
 
-    if (!transaction) {
+    if (!transactionRecord) {
+      await transaction.rollback();
       return res.status(404).json({ message: "Transaction not found" });
     }
 
     const isSpecial = invoice_no.startsWith("SPT");
 
-    // Update the transaction
+    // Update the transaction fields
+    const transactionUpdates: any = {};
+
     if (updates.adult_count !== undefined) {
-      await transaction.update({ adult_count: updates.adult_count });
+      transactionUpdates.adult_count = updates.adult_count;
     }
 
     if (updates.child_count !== undefined) {
-      await transaction.update({ child_count: updates.child_count });
+      transactionUpdates.child_count = updates.child_count;
     }
 
     if (updates.category !== undefined) {
-      await transaction.update({ category: updates.category });
+      transactionUpdates.category = updates.category;
     }
 
     if (updates.total_paid !== undefined) {
-      await transaction.update({ total_paid: updates.total_paid });
+      transactionUpdates.total_paid = updates.total_paid;
     }
 
     if (updates.date !== undefined) {
-      await transaction.update({ date: new Date(updates.date) });
+      transactionUpdates.date = new Date(updates.date);
+    }
+
+    // Apply transaction updates if any
+    if (Object.keys(transactionUpdates).length > 0) {
+      await Transaction.update(transactionUpdates, {
+        where: { invoice_no },
+        transaction,
+      });
     }
 
     // Update the associated ticket
@@ -692,7 +708,8 @@ export const updateCalendarTransaction = async (
 
     if (Object.keys(ticketUpdates).length > 0) {
       await Ticket.update(ticketUpdates, {
-        where: { id: transaction.ticket_id },
+        where: { id: transactionRecord.ticket_id },
+        transaction,
       });
     }
 
@@ -740,12 +757,19 @@ export const updateCalendarTransaction = async (
         if (isSpecial) {
           await SpecialTicket.update(userTicketUpdates, {
             where: { invoice_no },
+            transaction,
           });
         } else {
-          await UserTicket.update(userTicketUpdates, { where: { invoice_no } });
+          await UserTicket.update(userTicketUpdates, {
+            where: { invoice_no },
+            transaction,
+          });
         }
       }
     }
+
+    // Commit the transaction
+    await transaction.commit();
 
     // Fetch the updated transaction with associations
     const updatedTransaction = await Transaction.findOne({
@@ -758,7 +782,6 @@ export const updateCalendarTransaction = async (
 
     let userTicketData = {};
     if (invoice_no.startsWith("TKT") || invoice_no.startsWith("SPT")) {
-      const isSpecial = invoice_no.startsWith("SPT");
       const userTicket = isSpecial
         ? await SpecialTicket.findOne({ where: { invoice_no } })
         : await UserTicket.findOne({ where: { invoice_no } });
@@ -796,6 +819,7 @@ export const updateCalendarTransaction = async (
 
     res.json(responseData);
   } catch (error) {
+    await transaction.rollback();
     console.error("Error in updateCalendarTransaction:", error);
     res.status(500).json({ message: "Internal server error" });
   }

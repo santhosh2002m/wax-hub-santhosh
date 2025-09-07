@@ -1,4 +1,3 @@
-// FILE: routes/analyticsRoutes.ts
 import express from "express";
 import {
   getTodayOverview,
@@ -12,9 +11,26 @@ import {
 import {
   authenticateJWT,
   authorizeAdminOrManager,
-} from "../middlewares/authMiddleware"; // Changed from authorizeAdmin to authorizeAdminOrManager
+} from "../middlewares/authMiddleware";
+import { transactionUpdateSchema } from "../schemas/transactionSchema";
 
 const router = express.Router();
+
+// Add validation middleware for update route
+const validateUpdate = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const { error } = transactionUpdateSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      message: "Validation error",
+      details: error.details.map((err) => err.message),
+    });
+  }
+  next();
+};
 
 router.get(
   "/today",
@@ -56,6 +72,7 @@ router.put(
   "/calendar/:invoice_no",
   authenticateJWT,
   authorizeAdminOrManager,
+  validateUpdate, // Add validation middleware
   updateCalendarTransaction
 );
 
