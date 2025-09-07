@@ -8,6 +8,7 @@ import Transaction from "../models/transactionModel";
 import Counter from "../models/counterModel";
 import UserGuide from "../models/userGuideModel";
 import { v4 as uuidv4 } from "uuid";
+import { InvoiceNumberGenerator } from "../utils/invoiceNumberGenerator";
 
 interface AuthenticatedUser {
   id: number;
@@ -170,8 +171,11 @@ export const createUserTicket = async (req: Request, res: Response) => {
         .json({ message: "Use special ticket route for special counters" });
     }
 
-    // Generate unique invoice number
-    const invoice_no = await generateUniqueInvoiceNo();
+    // Generate invoice number for user ticket
+    const invoiceNumber = await InvoiceNumberGenerator.getNextInvoiceNumber(
+      false
+    );
+    const invoice_no = `TKT${invoiceNumber.toString().padStart(6, "0")}`;
 
     // Set default values for optional fields
     const ticketData = {

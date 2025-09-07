@@ -465,11 +465,14 @@ export const getCalendarView = async (req: Request, res: Response) => {
         .json({ message: "startDate and endDate are required" });
     }
 
-    // FIXED: Removed is_analytics from the date filter
+    // FIXED: Filter out special invoices (SPT prefix) for admin dashboard
     const whereClause: WhereOptions = {
       date: {
         [Op.gte]: new Date(startDate as string),
         [Op.lte]: new Date(endDate as string),
+      },
+      invoice_no: {
+        [Op.notLike]: "SPT%", // Exclude special tickets
       },
     };
 

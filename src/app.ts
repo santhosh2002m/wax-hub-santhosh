@@ -17,6 +17,7 @@ import specialTicketRoutes from "./routes/specialTicketRoutes";
 import userAuthRoutes from "./routes/userAuthRoutes";
 import { createSpecialCounter } from "./controllers/counterController";
 import twilioRoutes from "./routes/twilioRoutes";
+import invoiceRoutes from "./routes/invoiceRoutes";
 import { scheduleDailyCleanup, cleanupOldTickets } from "./utils/dailyCleanup";
 
 dotenv.config();
@@ -60,6 +61,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/user/tickets", userTicketRoutes);
 app.use("/api/user/guides", userGuideRoutes);
 app.use("/api/special/tickets", specialTicketRoutes);
+app.use("/api/invoice", invoiceRoutes);
 app.use("/api/user/auth", userAuthRoutes);
 app.use("/api/twilio", twilioRoutes);
 

@@ -7,6 +7,7 @@ import Ticket from "../models/ticketModel";
 import Transaction from "../models/transactionModel";
 import Counter from "../models/counterModel";
 import { v4 as uuidv4 } from "uuid";
+import { InvoiceNumberGenerator } from "../utils/invoiceNumberGenerator";
 
 interface AuthenticatedUser {
   id: number;
@@ -45,11 +46,11 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
         .json({ message: "Access denied: Special counter or admin required" });
     }
 
-    const generateInvoiceNo = async (): Promise<string> => {
-      return `SPT${uuidv4().slice(0, 8).toUpperCase()}`;
-    };
-
-    const invoice_no = await generateInvoiceNo();
+    // Generate invoice number for special ticket
+    const invoiceNumber = await InvoiceNumberGenerator.getNextInvoiceNumber(
+      true
+    );
+    const invoice_no = `SPT${invoiceNumber.toString().padStart(6, "0")}`;
 
     // Set default values for optional fields
     const ticketData: any = {
@@ -99,7 +100,6 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
 // FILE: controllers/specialTicketController.ts - ENHANCE getSpecialTickets function
 export const getSpecialTickets = async (req: Request, res: Response) => {
   try {
