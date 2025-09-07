@@ -96,12 +96,10 @@ const PORT = process.env.PORT || 3000;
 
 // HTTPS configuration with self-signed certificate
 const httpsOptions = {
-  key: fs.readFileSync(path.join(__dirname, "ssl", "key.pem")),
-  cert: fs.readFileSync(path.join(__dirname, "ssl", "cert.pem")),
-  // Allow self-signed certificates
+  key: fs.readFileSync(path.join(__dirname, "..", "ssl", "key.pem")),
+  cert: fs.readFileSync(path.join(__dirname, "..", "ssl", "cert.pem")),
   rejectUnauthorized: false,
 };
-
 // Create HTTPS server
 https.createServer(httpsOptions, app).listen(PORT, () => {
   console.log(`HTTPS Server running on https://68.178.168.156:${PORT}`);
