@@ -1,8 +1,16 @@
-// ===== FILE: seeders/003-ticket-seeder.ts =====
 import { QueryInterface } from "sequelize";
 
 interface CounterResult {
   id: number;
+}
+
+interface Ticket {
+  price: number;
+  dropdown_name: string;
+  show_name: string;
+  counter_id: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 module.exports = {
@@ -12,17 +20,20 @@ module.exports = {
       "SELECT id FROM counters;"
     )) as [CounterResult[], unknown];
 
-    const tickets = [];
+    const tickets: Ticket[] = [];
     const showNames = [
-      "Laser Show",
-      "Water Show",
-      "Light Show",
-      "Dance Performance",
+      "Wax Museum",
+      "Combo",
+      "Horror House",
+      "40 Horror or Wax",
+      "Combo, Wax Museum",
+      "Horror House, Wax Museum",
+      "50 Combo",
     ];
     const dropdownNames = ["Regular", "VIP", "Premium", "Standard"];
 
-    // Generate tickets for the last 30 days
-    for (let i = 0; i < 100; i++) {
+    // Generate exactly 7 tickets, one for each show name
+    showNames.forEach((showName) => {
       const randomCounter =
         counters[Math.floor(Math.random() * counters.length)];
       const randomDaysAgo = Math.floor(Math.random() * 30);
@@ -33,12 +44,12 @@ module.exports = {
         price: Math.floor(Math.random() * 500) + 100,
         dropdown_name:
           dropdownNames[Math.floor(Math.random() * dropdownNames.length)],
-        show_name: showNames[Math.floor(Math.random() * showNames.length)],
+        show_name: showName,
         counter_id: randomCounter.id,
         createdAt: createdAt,
         updatedAt: createdAt,
       });
-    }
+    });
 
     await queryInterface.bulkInsert("tickets", tickets);
   },
