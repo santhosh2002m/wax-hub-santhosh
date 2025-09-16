@@ -10,7 +10,8 @@ interface TicketAttributes {
   dropdown_name: string;
   show_name: string;
   counter_id?: number | null;
-  is_analytics: boolean; // This field distinguishes admin vs user tickets
+  is_analytics: boolean;
+  deleted: boolean; // Add this field
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -18,7 +19,7 @@ interface TicketAttributes {
 export interface TicketCreationAttributes
   extends Optional<
     TicketAttributes,
-    "id" | "createdAt" | "updatedAt" | "counter_id" | "is_analytics"
+    "id" | "createdAt" | "updatedAt" | "counter_id" | "is_analytics" | "deleted"
   > {}
 
 class Ticket
@@ -31,6 +32,7 @@ class Ticket
   public show_name!: string;
   public counter_id?: number | null;
   public is_analytics!: boolean;
+  public deleted!: boolean; // Add this field
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -46,6 +48,12 @@ Ticket.init(
     show_name: { type: DataTypes.STRING, allowNull: false },
     counter_id: { type: DataTypes.INTEGER, allowNull: true },
     is_analytics: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
+    deleted: {
+      // Add this field
       type: DataTypes.BOOLEAN,
       defaultValue: false,
       allowNull: false,

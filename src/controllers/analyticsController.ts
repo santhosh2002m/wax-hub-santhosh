@@ -465,19 +465,14 @@ export const getCalendarView = async (req: Request, res: Response) => {
         .json({ message: "startDate and endDate are required" });
     }
 
-    // FIXED: Filter out special invoices (SPT prefix) for admin dashboard
-    const whereClause: WhereOptions = {
-      date: {
-        [Op.gte]: new Date(startDate as string),
-        [Op.lte]: new Date(endDate as string),
+    // Get ALL transactions (including special tickets) for proper sequencing
+    const allTransactions = await Transaction.findAll({
+      where: {
+        date: {
+          [Op.gte]: new Date(startDate as string),
+          [Op.lte]: new Date(endDate as string),
+        },
       },
-      invoice_no: {
-        [Op.notLike]: "SPT%", // Exclude special tickets
-      },
-    };
-
-    const transactions = await Transaction.findAll({
-      where: whereClause,
       include: [
         {
           model: Ticket,
@@ -485,26 +480,39 @@ export const getCalendarView = async (req: Request, res: Response) => {
         },
         { model: Counter, as: "counter", attributes: ["id", "username"] },
       ],
-      order: [["date", "ASC"]],
+      order: [["createdAt", "ASC"]], // Sort by creation time for proper sequence
     });
 
+    // Filter out special invoices (SPT prefix) for display but keep for sequencing
+    const displayTransactions = allTransactions.filter(
+      (transaction) => !transaction.invoice_no.startsWith("SPT")
+    );
+
+    // Get the last invoice number from the entire database to continue numbering
+    const lastTransaction = await Transaction.findOne({
+      order: [["createdAt", "DESC"]],
+      attributes: ["invoice_no"],
+    });
+
+    let lastInvoiceNumber = 0;
+    if (lastTransaction && lastTransaction.invoice_no) {
+      // Extract numeric part from invoice number (e.g., "TKT6523" -> 6523)
+      const match = lastTransaction.invoice_no.match(/\d+/);
+      if (match) {
+        lastInvoiceNumber = parseInt(match[0], 10);
+      }
+    }
+
+    // Create sequential invoice numbers starting from lastInvoiceNumber + 1
     const calendarData = await Promise.all(
-      transactions.map(async (transaction: any) => {
+      displayTransactions.map(async (transaction: any, index: number) => {
         const ticketJson = transaction.ticket.toJSON();
         let additionalData = {};
 
-        if (
-          transaction.invoice_no.startsWith("TKT") ||
-          transaction.invoice_no.startsWith("SPT")
-        ) {
-          const isSpecial = transaction.invoice_no.startsWith("SPT");
-          const ticketDetails = isSpecial
-            ? await SpecialTicket.findOne({
-                where: { invoice_no: transaction.invoice_no },
-              })
-            : await UserTicket.findOne({
-                where: { invoice_no: transaction.invoice_no },
-              });
+        if (transaction.invoice_no.startsWith("TKT")) {
+          const ticketDetails = await UserTicket.findOne({
+            where: { invoice_no: transaction.invoice_no },
+          });
 
           if (ticketDetails) {
             additionalData = {
@@ -521,12 +529,16 @@ export const getCalendarView = async (req: Request, res: Response) => {
           }
         }
 
+        // Generate sequential invoice number for display
+        const displayInvoiceNo = lastInvoiceNumber + index + 1;
+
         return {
           date: formatISODate(transaction.date),
           ticket: {
             ...ticketJson,
             ...additionalData,
-            invoice_no: transaction.invoice_no,
+            invoice_no: transaction.invoice_no, // Keep original for reference
+            display_invoice_no: displayInvoiceNo.toString(), // Add sequential display number
             adult_count: transaction.adult_count,
             child_count: transaction.child_count,
             category: transaction.category,
@@ -579,59 +591,70 @@ export const getCalendarView = async (req: Request, res: Response) => {
   }
 };
 
-// ... rest of the file (deleteCalendarTransaction and updateCalendarTransaction) remains the same
-// NEW: Delete transaction and associated ticket
+// FIXED: Delete calendar transaction function
 export const deleteCalendarTransaction = async (
   req: Request,
   res: Response
 ) => {
+  const transaction = await Transaction.sequelize!.transaction();
+
   try {
     const { invoice_no } = req.params;
 
     if (!invoice_no) {
+      await transaction.rollback();
       return res.status(400).json({ message: "Invoice number is required" });
     }
 
     // Find the transaction
-    const transaction = await Transaction.findOne({
+    const transactionRecord = await Transaction.findOne({
       where: { invoice_no },
       include: [{ model: Ticket, as: "ticket" }],
+      transaction,
     });
 
-    if (!transaction) {
+    if (!transactionRecord) {
+      await transaction.rollback();
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    const ticketId = transaction.ticket_id;
     const isSpecial = invoice_no.startsWith("SPT");
 
     // Delete associated UserTicket or SpecialTicket if it exists
     if (invoice_no.startsWith("TKT") || invoice_no.startsWith("SPT")) {
       if (isSpecial) {
-        await SpecialTicket.destroy({ where: { invoice_no } });
+        await SpecialTicket.destroy({
+          where: { invoice_no },
+          transaction,
+        });
       } else {
-        await UserTicket.destroy({ where: { invoice_no } });
+        await UserTicket.destroy({
+          where: { invoice_no },
+          transaction,
+        });
       }
     }
 
     // Delete the transaction
-    await Transaction.destroy({ where: { invoice_no } });
+    await Transaction.destroy({
+      where: { invoice_no },
+      transaction,
+    });
 
-    // Delete the ticket
-    await Ticket.destroy({ where: { id: ticketId } });
+    // Commit the transaction
+    await transaction.commit();
 
     res.json({
-      message: "Transaction and associated ticket deleted successfully",
+      message: "Transaction deleted successfully",
     });
   } catch (error) {
+    await transaction.rollback();
     console.error("Error in deleteCalendarTransaction:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// ... existing imports ...
-
-// NEW: Update transaction and associated ticket - REMOVE VALIDATION
+// FIXED: Update calendar transaction function with invoice number update support
 export const updateCalendarTransaction = async (
   req: Request,
   res: Response
@@ -660,11 +683,26 @@ export const updateCalendarTransaction = async (
     }
 
     const isSpecial = invoice_no.startsWith("SPT");
+    const newInvoiceNo = updates.invoice_no;
+    const isChangingInvoiceNo = newInvoiceNo && newInvoiceNo !== invoice_no;
 
-    // Update the transaction fields - ALLOW ANY FIELD
+    // Check if new invoice number already exists
+    if (isChangingInvoiceNo) {
+      const existingTransaction = await Transaction.findOne({
+        where: { invoice_no: newInvoiceNo },
+        transaction,
+      });
+
+      if (existingTransaction) {
+        await transaction.rollback();
+        return res
+          .status(400)
+          .json({ message: "Invoice number already exists" });
+      }
+    }
+
+    // Update the transaction fields
     const transactionUpdates: any = {};
-
-    // Allow any transaction field to be updated
     Object.keys(updates).forEach((key) => {
       if (
         [
@@ -673,6 +711,7 @@ export const updateCalendarTransaction = async (
           "category",
           "total_paid",
           "date",
+          "invoice_no", // Allow invoice_no to be updated
         ].includes(key)
       ) {
         if (key === "date") {
@@ -691,7 +730,7 @@ export const updateCalendarTransaction = async (
       });
     }
 
-    // Update the associated ticket - ALLOW ANY FIELD
+    // Update the associated ticket
     const ticketUpdates: any = {};
     Object.keys(updates).forEach((key) => {
       if (
@@ -701,14 +740,14 @@ export const updateCalendarTransaction = async (
       }
     });
 
-    if (Object.keys(ticketUpdates).length > 0) {
+    if (Object.keys(ticketUpdates).length > 0 && transactionRecord.ticket_id) {
       await Ticket.update(ticketUpdates, {
         where: { id: transactionRecord.ticket_id },
         transaction,
       });
     }
 
-    // Update UserTicket or SpecialTicket if it exists - ALLOW ANY FIELD
+    // Update UserTicket or SpecialTicket if it exists
     if (invoice_no.startsWith("TKT") || invoice_no.startsWith("SPT")) {
       const userTicketUpdates: any = {};
       const allowedUserTicketFields = [
@@ -722,6 +761,7 @@ export const updateCalendarTransaction = async (
         "tax",
         "final_amount",
         "status",
+        "invoice_no", // Allow invoice_no to be updated
       ];
 
       Object.keys(updates).forEach((key) => {
@@ -732,32 +772,53 @@ export const updateCalendarTransaction = async (
 
       if (Object.keys(userTicketUpdates).length > 0) {
         if (isSpecial) {
+          // If changing invoice number, we need to update the where clause
+          const whereClause = isChangingInvoiceNo
+            ? { invoice_no }
+            : { invoice_no: newInvoiceNo || invoice_no };
+
           await SpecialTicket.update(userTicketUpdates, {
-            where: { invoice_no },
+            where: whereClause,
             transaction,
           });
+
+          // If invoice number changed, we need to update the invoice_no in SpecialTicket
+          if (isChangingInvoiceNo) {
+            await SpecialTicket.update(
+              { invoice_no: newInvoiceNo },
+              { where: { invoice_no }, transaction }
+            );
+          }
         } else {
+          // If changing invoice number, we need to update the where clause
+          const whereClause = isChangingInvoiceNo
+            ? { invoice_no }
+            : { invoice_no: newInvoiceNo || invoice_no };
+
           await UserTicket.update(userTicketUpdates, {
-            where: { invoice_no },
+            where: whereClause,
             transaction,
           });
+
+          // If invoice number changed, we need to update the invoice_no in UserTicket
+          if (isChangingInvoiceNo) {
+            await UserTicket.update(
+              { invoice_no: newInvoiceNo },
+              { where: { invoice_no }, transaction }
+            );
+          }
         }
       }
-    }
-
-    // Handle payment_mode and other custom fields
-    if (updates.payment_mode !== undefined) {
-      // Store custom fields in a separate table or as JSON if needed
-      // For now, we'll just allow it without validation
-      console.log("Payment mode updated:", updates.payment_mode);
     }
 
     // Commit the transaction
     await transaction.commit();
 
-    // Fetch the updated transaction with associations
+    // Fetch the updated transaction with associations using the new invoice number if changed
+    const finalInvoiceNo = isChangingInvoiceNo ? newInvoiceNo : invoice_no;
+
     const updatedTransaction = await Transaction.findOne({
-      where: { invoice_no },
+      where: { invoice_no: finalInvoiceNo },
       include: [
         { model: Ticket, as: "ticket" },
         { model: Counter, as: "counter", attributes: ["id", "username"] },
@@ -765,10 +826,11 @@ export const updateCalendarTransaction = async (
     });
 
     let userTicketData = {};
-    if (invoice_no.startsWith("TKT") || invoice_no.startsWith("SPT")) {
-      const userTicket = isSpecial
-        ? await SpecialTicket.findOne({ where: { invoice_no } })
-        : await UserTicket.findOne({ where: { invoice_no } });
+    if (finalInvoiceNo.startsWith("TKT") || finalInvoiceNo.startsWith("SPT")) {
+      const isFinalSpecial = finalInvoiceNo.startsWith("SPT");
+      const userTicket = isFinalSpecial
+        ? await SpecialTicket.findOne({ where: { invoice_no: finalInvoiceNo } })
+        : await UserTicket.findOne({ where: { invoice_no: finalInvoiceNo } });
 
       if (userTicket) {
         userTicketData = {
@@ -785,7 +847,7 @@ export const updateCalendarTransaction = async (
       }
     }
 
-    // Create a properly typed response
+    // Create response
     const responseData: any = {
       message: "Transaction updated successfully",
       transaction: {
@@ -808,5 +870,3 @@ export const updateCalendarTransaction = async (
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
-// ... rest of the file ...

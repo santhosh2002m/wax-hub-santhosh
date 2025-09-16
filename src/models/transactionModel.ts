@@ -1,3 +1,4 @@
+// FILE: models/transactionModel.ts
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../config/database";
 import Counter from "./counterModel";
@@ -49,7 +50,14 @@ Transaction.init(
     child_count: { type: DataTypes.INTEGER, allowNull: false },
     category: { type: DataTypes.STRING, allowNull: false },
     total_paid: { type: DataTypes.FLOAT, allowNull: false },
-    ticket_id: { type: DataTypes.INTEGER, allowNull: false },
+    ticket_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: Ticket,
+        key: "id",
+      },
+    },
     counter_id: { type: DataTypes.INTEGER, allowNull: true },
     createdAt: { type: DataTypes.DATE, allowNull: false },
     updatedAt: { type: DataTypes.DATE, allowNull: false },
@@ -62,7 +70,11 @@ Transaction.init(
   }
 );
 
-Transaction.belongsTo(Ticket, { foreignKey: "ticket_id", as: "ticket" });
+Transaction.belongsTo(Ticket, {
+  foreignKey: "ticket_id",
+  as: "ticket",
+  onDelete: "SET NULL", // Add this to handle ticket deletion
+});
 Transaction.belongsTo(Counter, { foreignKey: "counter_id", as: "counter" });
 
 export default Transaction;
