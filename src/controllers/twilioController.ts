@@ -4,78 +4,84 @@ import TwilioMessage from "../models/twilioMessageModel";
 import { Op, fn, col, WhereOptions } from "sequelize";
 import { messageSchema, bulkMessageSchema } from "../schemas/twilioSchema";
 
+// ✅ Single message (handles free-form & template) - UPDATED WITH STATUS CALLBACK
 export const sendSingleMessage = async (req: Request, res: Response) => {
   try {
-    const { error } = messageSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({
-        message: "Validation error",
-        details: error.details.map((err) => err.message),
-      });
-    }
+    const { to, body, variables } = req.body;
 
-    const { to, body } = req.body;
+    const from = process.env.TWILIO_WHATSAPP_NUMBER;
+    if (!from) {
+      return res
+        .status(500)
+        .json({ message: "Twilio WhatsApp number not set" });
+    }
 
     const formattedTo = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
-    const from = process.env.TWILIO_WHATSAPP_NUMBER || "whatsapp:+14155238886";
 
-    try {
-      const message = await twilioClient.messages.create({
-        body,
+    // Get your server's base URL for webhook
+    const baseUrl =
+      process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+    const statusCallback = `${baseUrl}/api/twilio/webhook`;
+
+    let message;
+    if (variables && Object.keys(variables).length > 0) {
+      // Use template message
+      message = await twilioClient.messages.create({
         from,
         to: formattedTo,
+        contentSid: "HXb095502f5db7560846e70f5ca5c4c7d9", // your template SID
+        contentVariables: JSON.stringify(variables),
+        statusCallback: statusCallback, // ADDED STATUS CALLBACK
       });
-
-      const savedMessage = await TwilioMessage.create({
-        message_sid: message.sid,
-        to: formattedTo,
-        from: message.from,
-        body: message.body,
-        status: message.status,
-        direction: "outbound-api",
-        price: message.price,
-        price_unit: message.priceUnit,
-        error_code: message.errorCode ? message.errorCode.toString() : null,
-        error_message: message.errorMessage,
-      });
-
-      res.status(201).json({
-        message: "Message sent successfully",
-        data: {
-          sid: savedMessage.message_sid,
-          to: savedMessage.to,
-          from: savedMessage.from,
-          body: savedMessage.body,
-          status: savedMessage.status,
-          price: savedMessage.price,
-          price_unit: savedMessage.price_unit,
-        },
-      });
-    } catch (twilioError: any) {
-      console.error("Twilio error:", twilioError);
-
-      await TwilioMessage.create({
-        message_sid: `failed_${Date.now()}`,
-        to: formattedTo,
+    } else {
+      // Use free-form body message
+      if (!body) {
+        return res.status(400).json({
+          message: "Body is required when variables are not provided",
+        });
+      }
+      message = await twilioClient.messages.create({
         from,
+        to: formattedTo,
         body,
-        status: "failed",
-        direction: "outbound-api",
-        error_code: twilioError.code ? twilioError.code.toString() : null,
-        error_message: twilioError.message,
-      });
-
-      return res.status(500).json({
-        message: "Failed to send message",
-        error: twilioError.message,
+        statusCallback: statusCallback, // ADDED STATUS CALLBACK
       });
     }
-  } catch (error) {
-    console.error("Error in sendSingleMessage:", error);
-    res.status(500).json({ message: "Internal server error" });
+
+    // Save in DB
+    await TwilioMessage.create({
+      message_sid: message.sid,
+      to: formattedTo,
+      from: message.from,
+      body: message.body,
+      status: message.status,
+      direction: "outbound-api",
+      price: message.price,
+      price_unit: message.priceUnit,
+      error_code: message.errorCode ? message.errorCode.toString() : null,
+      error_message: message.errorMessage,
+    });
+
+    res.status(201).json({
+      message: "Message sent successfully",
+      data: {
+        sid: message.sid,
+        to: message.to,
+        from: message.from,
+        status: message.status,
+        note: "Status will update via webhook. Check message later for delivery status.",
+      },
+    });
+  } catch (error: any) {
+    console.error("Twilio error:", error);
+    res.status(500).json({
+      message: "Failed to send message",
+      error: error.message,
+    });
   }
 };
 
+// ✅ Bulk messages (supports both template & body) - UPDATED WITH STATUS CALLBACK
 export const sendBulkMessages = async (req: Request, res: Response) => {
   try {
     const { error } = bulkMessageSchema.validate(req.body);
@@ -86,19 +92,44 @@ export const sendBulkMessages = async (req: Request, res: Response) => {
       });
     }
 
-    const { recipients, body } = req.body;
-    const from = process.env.TWILIO_WHATSAPP_NUMBER || "whatsapp:+14155238886";
+    const { recipients, body, variables } = req.body;
+
+    const from = process.env.TWILIO_WHATSAPP_NUMBER;
+    if (!from) {
+      console.error("TWILIO_WHATSAPP_NUMBER environment variable is not set");
+      return res.status(500).json({
+        message: "Server configuration error",
+        error: "Twilio WhatsApp number is not configured",
+      });
+    }
+
+    // Get your server's base URL for webhook
+    const baseUrl =
+      process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+    const statusCallback = `${baseUrl}/api/twilio/webhook`;
 
     const results = await Promise.allSettled(
       recipients.map(async (to: string) => {
         const formattedTo = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
 
         try {
-          const message = await twilioClient.messages.create({
-            body,
-            from,
-            to: formattedTo,
-          });
+          let message;
+          if (variables && Object.keys(variables).length > 0) {
+            message = await twilioClient.messages.create({
+              from,
+              to: formattedTo,
+              contentSid: "HXb095502f5db7560846e70f5ca5c4c7d9", // your template SID
+              contentVariables: JSON.stringify(variables),
+              statusCallback: statusCallback, // ADDED STATUS CALLBACK
+            });
+          } else {
+            message = await twilioClient.messages.create({
+              body,
+              from,
+              to: formattedTo,
+              statusCallback: statusCallback, // ADDED STATUS CALLBACK
+            });
+          }
 
           await TwilioMessage.create({
             message_sid: message.sid,
@@ -170,6 +201,127 @@ export const sendBulkMessages = async (req: Request, res: Response) => {
   }
 };
 
+// ✅ IMPROVED WEBHOOK HANDLER
+export const handleTwilioWebhook = async (req: Request, res: Response) => {
+  try {
+    console.log("📨 Twilio Webhook Received:", req.body);
+
+    const {
+      MessageSid,
+      MessageStatus,
+      To,
+      From,
+      ErrorCode,
+      ErrorMessage,
+      SmsSid,
+      SmsStatus,
+    } = req.body;
+
+    // Use either MessageSid (WhatsApp) or SmsSid (SMS)
+    const messageSid = MessageSid || SmsSid;
+    const messageStatus = MessageStatus || SmsStatus;
+
+    if (messageSid) {
+      const errorCodeString = ErrorCode ? ErrorCode.toString() : null;
+
+      const [updatedCount] = await TwilioMessage.update(
+        {
+          status: messageStatus,
+          error_code: errorCodeString,
+          error_message: ErrorMessage,
+          updatedAt: new Date(),
+        },
+        {
+          where: {
+            message_sid: messageSid,
+          },
+        }
+      );
+
+      if (updatedCount > 0) {
+        console.log(
+          `✅ Updated message ${messageSid} status to: ${messageStatus}`
+        );
+      } else {
+        console.log(`⚠️ Message ${messageSid} not found in database`);
+
+        // If message not found, create a new record for inbound messages
+        if (messageStatus === "received") {
+          await TwilioMessage.create({
+            message_sid: messageSid,
+            to: To,
+            from: From,
+            body: req.body.Body || "No content",
+            status: messageStatus,
+            direction: "inbound",
+            error_code: errorCodeString,
+            error_message: ErrorMessage,
+          });
+          console.log(`📥 Created inbound message record for ${messageSid}`);
+        }
+      }
+    }
+
+    // Always respond with 200 to acknowledge receipt
+    res.set("Content-Type", "text/xml");
+    res
+      .status(200)
+      .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  } catch (error) {
+    console.error("❌ Error in handleTwilioWebhook:", error);
+    res.set("Content-Type", "text/xml");
+    res
+      .status(500)
+      .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  }
+};
+
+// ✅ NEW: Check message status from Twilio API
+export const refreshMessageStatus = async (req: Request, res: Response) => {
+  try {
+    const { messageSid } = req.params;
+
+    // Fetch current status from Twilio
+    const message = await twilioClient.messages(messageSid).fetch();
+
+    // Update database
+    const [updatedCount] = await TwilioMessage.update(
+      {
+        status: message.status,
+        error_code: message.errorCode ? message.errorCode.toString() : null,
+        error_message: message.errorMessage,
+        updatedAt: new Date(),
+      },
+      {
+        where: {
+          message_sid: messageSid,
+        },
+      }
+    );
+
+    if (updatedCount > 0) {
+      res.json({
+        message: "Status refreshed successfully",
+        data: {
+          sid: message.sid,
+          status: message.status,
+          error_code: message.errorCode,
+          error_message: message.errorMessage,
+        },
+      });
+    } else {
+      res.status(404).json({ message: "Message not found in database" });
+    }
+  } catch (error: any) {
+    console.error("Error refreshing message status:", error);
+    res.status(500).json({
+      message: "Failed to refresh message status",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ Rest of the functions remain the same...
 export const getMessages = async (req: Request, res: Response) => {
   try {
     const {
@@ -234,6 +386,7 @@ export const getMessages = async (req: Request, res: Response) => {
         error_code: message.error_code,
         error_message: message.error_message,
         createdAt: message.createdAt,
+        updatedAt: message.updatedAt,
       })),
       total: count,
       page: pageNum,
@@ -331,30 +484,5 @@ export const getMessageStats = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error in getMessageStats:", error);
     res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-export const handleTwilioWebhook = async (req: Request, res: Response) => {
-  try {
-    const { MessageSid, MessageStatus, To, From, ErrorCode, ErrorMessage } =
-      req.body;
-
-    if (MessageSid) {
-      const errorCodeString = ErrorCode ? ErrorCode.toString() : null;
-
-      await TwilioMessage.update(
-        {
-          status: MessageStatus,
-          error_code: errorCodeString,
-          error_message: ErrorMessage,
-        },
-        { where: { message_sid: MessageSid } }
-      );
-    }
-
-    res.status(200).send("OK");
-  } catch (error) {
-    console.error("Error in handleTwilioWebhook:", error);
-    res.status(500).send("Error");
   }
 };

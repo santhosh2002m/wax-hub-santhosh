@@ -120,10 +120,18 @@ export const getSpecialTickets = async (req: Request, res: Response) => {
       });
     }
 
-    const { startDate, endDate, search, page = "1", limit = "10" } = req.query;
-    const pageNum = parseInt(page as string, 10);
-    const limitNum = parseInt(limit as string, 10);
-    const offset = (pageNum - 1) * limitNum;
+    const { startDate, endDate, search, page, limit, showAll } = req.query;
+
+    // Check if showAll parameter is provided to disable pagination
+    const shouldShowAll = showAll === "true";
+
+    const pageNum = parseInt(page as string, 10) || 1;
+    const limitNum = shouldShowAll
+      ? undefined
+      : parseInt(limit as string, 10) || 10;
+    const offset = shouldShowAll
+      ? undefined
+      : (pageNum - 1) * (limitNum as number);
 
     // Get today's date range (only show today's tickets by default)
     const today = new Date();
@@ -155,33 +163,65 @@ export const getSpecialTickets = async (req: Request, res: Response) => {
       ];
     }
 
-    const { count, rows: tickets } = await SpecialTicket.findAndCountAll({
-      where: whereClause,
-      order: [["createdAt", "DESC"]],
-      limit: limitNum,
-      offset,
-    });
+    // Different query based on whether we want all tickets or paginated
+    let result;
+    if (shouldShowAll) {
+      const tickets = await SpecialTicket.findAll({
+        where: whereClause,
+        order: [["createdAt", "DESC"]],
+      });
 
-    res.json({
-      tickets: tickets.map((ticket) => ({
-        id: ticket.id,
-        invoice_no: ticket.invoice_no,
-        vehicle_type: ticket.vehicle_type,
-        guide_name: ticket.guide_name,
-        guide_number: ticket.guide_number,
-        show_name: ticket.show_name,
-        adults: ticket.adults,
-        ticket_price: ticket.ticket_price,
-        total_price: ticket.total_price,
-        tax: ticket.tax,
-        final_amount: ticket.final_amount,
-        status: ticket.status,
-        createdAt: ticket.createdAt,
-      })),
-      total: count,
-      page: pageNum,
-      pages: Math.ceil(count / limitNum),
-    });
+      result = {
+        tickets: tickets.map((ticket) => ({
+          id: ticket.id,
+          invoice_no: ticket.invoice_no,
+          vehicle_type: ticket.vehicle_type,
+          guide_name: ticket.guide_name,
+          guide_number: ticket.guide_number,
+          show_name: ticket.show_name,
+          adults: ticket.adults,
+          ticket_price: ticket.ticket_price,
+          total_price: ticket.total_price,
+          tax: ticket.tax,
+          final_amount: ticket.final_amount,
+          status: ticket.status,
+          createdAt: ticket.createdAt,
+        })),
+        total: tickets.length,
+        page: 1,
+        pages: 1,
+      };
+    } else {
+      const { count, rows: tickets } = await SpecialTicket.findAndCountAll({
+        where: whereClause,
+        order: [["createdAt", "DESC"]],
+        limit: limitNum,
+        offset,
+      });
+
+      result = {
+        tickets: tickets.map((ticket) => ({
+          id: ticket.id,
+          invoice_no: ticket.invoice_no,
+          vehicle_type: ticket.vehicle_type,
+          guide_name: ticket.guide_name,
+          guide_number: ticket.guide_number,
+          show_name: ticket.show_name,
+          adults: ticket.adults,
+          ticket_price: ticket.ticket_price,
+          total_price: ticket.total_price,
+          tax: ticket.tax,
+          final_amount: ticket.final_amount,
+          status: ticket.status,
+          createdAt: ticket.createdAt,
+        })),
+        total: count,
+        page: pageNum,
+        pages: Math.ceil(count / (limitNum as number)),
+      };
+    }
+
+    res.json(result);
   } catch (error) {
     console.error("Error in getSpecialTickets:", error);
     res.status(500).json({ message: "Internal server error" });
