@@ -1,13 +1,11 @@
 import express from "express";
-import {
-  sendSingleMessage,
-  sendBulkMessages,
-  getMessages,
-  getMessageById,
-  getMessageStats,
-  handleTwilioWebhook,
-  refreshMessageStatus, // ADDED NEW FUNCTION
-} from "../controllers/twilioController";
+import sendSingleMessage from "../controllers/twilioController";
+import sendBulkMessages from "../controllers/twilioController";
+import getMessages from "../controllers/twilioController";
+import getMessageById from "../controllers/twilioController";
+import getMessageStats from "../controllers/twilioController";
+import handleTwilioWebhook from "../controllers/twilioController";
+import refreshMessageStatus from "../controllers/twilioController";
 import {
   authenticateJWT,
   authorizeAdmin,

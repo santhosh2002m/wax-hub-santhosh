@@ -62,10 +62,15 @@ export class SpecialTicket
   };
 }
 
+// FILE: models/SpecialTicket.ts - Updated
 SpecialTicket.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    invoice_no: { type: DataTypes.STRING, allowNull: false, unique: true },
+    invoice_no: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      // REMOVE unique: true to allow duplicates
+    },
     vehicle_type: { type: DataTypes.STRING, allowNull: false },
     guide_name: { type: DataTypes.STRING, allowNull: false },
     guide_number: { type: DataTypes.STRING, allowNull: false },
@@ -92,7 +97,6 @@ SpecialTicket.init(
     underscored: false,
   }
 );
-
 SpecialTicket.belongsTo(Counter, { foreignKey: "counter_id", as: "counter" });
 
 export default SpecialTicket;

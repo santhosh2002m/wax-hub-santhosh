@@ -14,6 +14,7 @@ interface AuthenticatedUser {
   special?: boolean;
 }
 
+// Updated createSpecialTicket function - Add retry logic
 export const createSpecialTicket = async (req: Request, res: Response) => {
   try {
     const { error } = userTicketSchema.validate(req.body, {
@@ -36,32 +37,58 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Counter not found" });
     }
 
-    // Allow special counters OR admins to create special tickets
     if (!counter.special && user.role !== "admin") {
       return res
         .status(403)
         .json({ message: "Access denied: Special counter or admin required" });
     }
 
-    // Generate invoice number for special ticket
-    const invoiceNumber = await InvoiceNumberGenerator.getNextInvoiceNumber(
-      true
-    );
-    const invoice_no = invoiceNumber.toString().padStart(2, "0"); // 2-digit format
+    // Try creating the ticket with retry logic for duplicate invoice numbers
+    let retries = 3;
+    let ticket;
 
-    // Set default values for optional fields
-    const ticketData: any = {
-      ...req.body,
-      invoice_no,
-      counter_id: user.id,
-      status: "completed" as const,
-      vehicle_type: req.body.vehicle_type || "N/A",
-      guide_name: req.body.guide_name || "N/A",
-      guide_number: req.body.guide_number || "N/A",
-    };
+    while (retries > 0) {
+      try {
+        const invoiceNumber = await InvoiceNumberGenerator.getNextInvoiceNumber(
+          true
+        );
+        const invoice_no = invoiceNumber.toString().padStart(2, "0");
 
-    // FIX: Only create the SpecialTicket, DO NOT create admin dashboard Ticket
-    const ticket = await SpecialTicket.create(ticketData);
+        const ticketData: any = {
+          ...req.body,
+          invoice_no,
+          counter_id: user.id,
+          status: "completed" as const,
+          vehicle_type: req.body.vehicle_type || "N/A",
+          guide_name: req.body.guide_name || "N/A",
+          guide_number: req.body.guide_number || "N/A",
+        };
+
+        ticket = await SpecialTicket.create(ticketData);
+        break; // Success, break out of retry loop
+      } catch (error: any) {
+        if (error.name === "SequelizeUniqueConstraintError" && retries > 1) {
+          // Duplicate invoice, retry with new number
+          retries--;
+          continue;
+        } else if (error.name === "SequelizeUniqueConstraintError") {
+          // Final attempt failed
+          return res.status(400).json({
+            message: "Failed to create ticket due to duplicate invoice number",
+            error: "Please try again",
+          });
+        } else {
+          // Other errors
+          throw error;
+        }
+      }
+    }
+
+    if (!ticket) {
+      return res
+        .status(500)
+        .json({ message: "Failed to create ticket after retries" });
+    }
 
     res.status(201).json({
       message: "Special ticket created successfully",
@@ -83,12 +110,6 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Error in createSpecialTicket:", error);
-    if (error.name === "SequelizeUniqueConstraintError") {
-      return res.status(400).json({
-        message: "Failed to create ticket due to duplicate data",
-        error: "Please try again with different details",
-      });
-    }
     if (error.name === "SequelizeValidationError") {
       return res
         .status(400)

@@ -228,20 +228,20 @@ export const deleteTicket = async (req: Request, res: Response) => {
     }
 
     const user = (req as any).user as AuthenticatedUser;
-    let whereClause: any = { id: ticketId, deleted: false }; // Only soft delete non-deleted tickets
 
-    // If user is not admin, restrict deletion to their own tickets
-    if (user.role !== "admin") {
+    let whereClause: any = { id: ticketId, deleted: false };
+
+    // Allow admin or manager to delete any ticket
+    if (user.role !== "admin" && user.role !== "manager") {
+      // Other roles (staff, etc.) can delete only their own
       whereClause.counter_id = user.id;
     }
 
-    const ticket = await Ticket.findOne({
-      where: whereClause,
-    });
+    const ticket = await Ticket.findOne({ where: whereClause });
 
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
-    // Soft delete - mark as deleted instead of actually deleting
+    // Soft delete
     await ticket.update({ deleted: true });
 
     res.json({ message: "Ticket deleted successfully" });
