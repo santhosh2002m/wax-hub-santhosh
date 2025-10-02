@@ -1,11 +1,5 @@
 import express from "express";
-import sendSingleMessage from "../controllers/twilioController";
-import sendBulkMessages from "../controllers/twilioController";
-import getMessages from "../controllers/twilioController";
-import getMessageById from "../controllers/twilioController";
-import getMessageStats from "../controllers/twilioController";
-import handleTwilioWebhook from "../controllers/twilioController";
-import refreshMessageStatus from "../controllers/twilioController";
+import twilioController from "../controllers/twilioController";
 import {
   authenticateJWT,
   authorizeAdmin,
@@ -15,19 +9,24 @@ import {
 const router = express.Router();
 
 // Public webhook for Twilio status updates (NO AUTH NEEDED)
-router.post("/webhook", handleTwilioWebhook);
+router.post("/webhook", twilioController);
 
 // Protected routes
-router.post("/send", authenticateJWT, authorizeAdmin, sendSingleMessage);
-router.post("/send-bulk", authenticateJWT, authorizeAdmin, sendBulkMessages);
-router.get("/", authenticateJWT, authorizeAdminOrManager, getMessages);
-router.get("/stats", authenticateJWT, authorizeAdminOrManager, getMessageStats);
-router.get("/:id", authenticateJWT, authorizeAdminOrManager, getMessageById);
+router.post("/send", authenticateJWT, authorizeAdmin, twilioController);
+router.post("/send-bulk", authenticateJWT, authorizeAdmin, twilioController);
+router.get("/", authenticateJWT, authorizeAdminOrManager, twilioController);
+router.get(
+  "/stats",
+  authenticateJWT,
+  authorizeAdminOrManager,
+  twilioController
+);
+router.get("/:id", authenticateJWT, authorizeAdminOrManager, twilioController);
 router.post(
   "/refresh-status/:messageSid",
   authenticateJWT,
   authorizeAdminOrManager,
-  refreshMessageStatus
-); // NEW ROUTE
+  twilioController
+);
 
 export default router;

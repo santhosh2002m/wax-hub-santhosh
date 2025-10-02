@@ -6,13 +6,13 @@ const router = Router();
 const accountSid = process.env.TWILIO_ACCOUNT_SID!;
 const authToken = process.env.TWILIO_AUTH_TOKEN!;
 const from = process.env.TWILIO_WHATSAPP_NUMBER!;
-const templateSid = process.env.TWILIO_TEMPLATE_SID!; // ✅ now read from env
+const templateSid = process.env.TWILIO_TEMPLATE_SID!; // Make sure this is set
 const baseUrl = process.env.BASE_URL || "http://localhost:3000";
 
 const twilioClient = twilio(accountSid, authToken);
 
 // -----------------------------
-// Send single WhatsApp message
+// Send single WhatsApp message (USING TEMPLATE)
 // -----------------------------
 router.post("/send", async (req: Request, res: Response) => {
   try {
@@ -24,71 +24,31 @@ router.post("/send", async (req: Request, res: Response) => {
 
     const formattedTo = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
 
-    const statusCallback = `${baseUrl}/api/twilio/status`;
+    console.log("=== SENDING WHATSAPP TEMPLATE MESSAGE ===");
+    console.log("Business Number:", from);
+    console.log("To:", formattedTo);
+    console.log("Template SID:", templateSid);
+    console.log("Variables:", variables);
 
     const message = await twilioClient.messages.create({
-      from,
+      from: from,
       to: formattedTo,
-      contentSid: templateSid, // ✅ correct template
-      contentVariables: JSON.stringify(variables), // ✅ stringify once here
-      statusCallback,
+      contentSid: templateSid, // Use template, not free text
+      contentVariables: JSON.stringify(variables),
     });
 
-    res.json({ message: "Message sent", sid: message.sid });
+    console.log("✅ Template message sent. SID:", message.sid);
+
+    res.json({
+      message: "WhatsApp template message sent",
+      sid: message.sid,
+      status: message.status,
+    });
   } catch (err: any) {
     console.error("Send error:", err.message);
+    console.error("Error code:", err.code);
     res.status(500).json({ error: err.message });
   }
-});
-
-// -----------------------------
-// Send bulk WhatsApp messages
-// -----------------------------
-router.post("/send-bulk", async (req: Request, res: Response) => {
-  try {
-    const { recipients, variables } = req.body;
-
-    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-      return res.status(400).json({ error: "Recipients required" });
-    }
-
-    const results = await Promise.all(
-      recipients.map(async (to: string) => {
-        try {
-          const formattedTo = to.startsWith("whatsapp:")
-            ? to
-            : `whatsapp:${to}`;
-
-          const statusCallback = `${baseUrl}/api/twilio/status`;
-
-          const message = await twilioClient.messages.create({
-            from,
-            to: formattedTo,
-            contentSid: templateSid,
-            contentVariables: JSON.stringify(variables),
-            statusCallback,
-          });
-
-          return { to, sid: message.sid, status: "sent" };
-        } catch (error: any) {
-          return { to, error: error.message, status: "failed" };
-        }
-      })
-    );
-
-    res.json({ results });
-  } catch (err: any) {
-    console.error("Bulk error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// -----------------------------
-// Status webhook
-// -----------------------------
-router.post("/status", (req: Request, res: Response) => {
-  console.log("Status webhook received:", req.body);
-  res.sendStatus(200);
 });
 
 export default router;
