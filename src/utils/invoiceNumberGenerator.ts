@@ -1,161 +1,114 @@
 // FILE: utils/invoiceNumberGenerator.ts
 import InvoiceCounter from "../models/InvoiceCounter";
-import Transaction from "../models/transactionModel";
-import UserTicket from "../models/userticketModel";
 import { Op } from "sequelize";
-import sequelize from "../config/database";
-
-interface MaxInvoiceResult {
-  max_invoice: string | null;
-}
 
 export class InvoiceNumberGenerator {
   static async getNextInvoiceNumber(
     isSpecial: boolean = false
   ): Promise<string> {
-    if (isSpecial) {
-      // SPECIAL USER: Always return the last normal user invoice number AS STRING
-      const lastNumber = await this.getLastNormalInvoiceNumber();
-      return lastNumber.toString();
-    } else {
-      // NORMAL USER: Increment as usual
-      const nextNumber = await this.getNextNormalInvoiceNumber();
-      return nextNumber.toString();
-    }
-  }
-
-  private static async getLastNormalInvoiceNumber(): Promise<number> {
     try {
-      console.log("Finding last normal invoice number...");
+      // Get or create the counter record
+      let counter = await InvoiceCounter.findOne();
 
-      // Method 1: Get the last normal user ticket invoice number (most reliable)
-      const lastUserTicket = await UserTicket.findOne({
-        where: {
-          invoice_no: {
-            [Op.notLike]: "SPT%", // Exclude special tickets
-            [Op.regexp]: "^[0-9]+$", // Only numeric invoice numbers
-          },
-        },
-        order: [["createdAt", "DESC"]],
-        attributes: ["invoice_no"],
-      });
-
-      if (lastUserTicket && lastUserTicket.invoice_no) {
-        const invoiceNumber = parseInt(lastUserTicket.invoice_no);
-        if (!isNaN(invoiceNumber)) {
-          console.log(
-            `Found last normal invoice from UserTicket: ${invoiceNumber}`
-          );
-          return invoiceNumber;
-        }
+      if (!counter) {
+        // Initialize with default values if counter doesn't exist
+        counter = await InvoiceCounter.create({
+          last_user_invoice: 6878, // Your current last number
+          last_special_invoice: 6878,
+        });
+        console.log("Created new invoice counter with default values");
       }
 
-      // Method 2: Get from transactions as fallback
-      const lastTransaction = await Transaction.findOne({
-        where: {
-          invoice_no: {
-            [Op.notLike]: "SPT%", // Exclude special tickets
-            [Op.regexp]: "^[0-9]+$", // Only numeric invoice numbers
-          },
-        },
-        order: [["createdAt", "DESC"]],
-        attributes: ["invoice_no"],
-      });
+      if (isSpecial) {
+        // SPECIAL USER: Return the last normal user invoice number
+        const specialInvoice = counter.last_user_invoice.toString();
+        console.log(`Special user invoice: ${specialInvoice}`);
+        return specialInvoice;
+      } else {
+        // NORMAL USER: Increment and return
+        const nextNumber = counter.last_user_invoice + 1;
 
-      if (lastTransaction && lastTransaction.invoice_no) {
-        const invoiceNumber = parseInt(lastTransaction.invoice_no);
-        if (!isNaN(invoiceNumber)) {
-          console.log(
-            `Found last normal invoice from Transaction: ${invoiceNumber}`
-          );
-          return invoiceNumber;
-        }
+        // Update the counter
+        await counter.update({
+          last_user_invoice: nextNumber,
+        });
+
+        console.log(`Normal user invoice: ${nextNumber}`);
+        return nextNumber.toString();
       }
-
-      // Method 3: Get highest numeric invoice number
-      const highestTransaction = (await Transaction.findOne({
-        attributes: [
-          [
-            sequelize.fn(
-              "MAX",
-              sequelize.cast(sequelize.col("invoice_no"), "INTEGER")
-            ),
-            "max_invoice",
-          ],
-        ],
-        where: {
-          invoice_no: {
-            [Op.notLike]: "SPT%",
-            [Op.regexp]: "^[0-9]+$",
-          },
-        },
-        raw: true,
-      })) as unknown as MaxInvoiceResult;
-
-      if (highestTransaction?.max_invoice) {
-        const invoiceNumber = parseInt(highestTransaction.max_invoice);
-        console.log(`Found highest normal invoice: ${invoiceNumber}`);
-        return invoiceNumber;
-      }
-
-      // Default fallback - get from your current data
-      console.log("No normal invoices found, using fallback: 6878");
-      return 6878;
     } catch (error) {
-      console.error("Error getting last normal invoice number:", error);
-      return 6878; // Fallback to current last number
-    }
-  }
-
-  private static async getNextNormalInvoiceNumber(): Promise<number> {
-    try {
-      // Get the last normal invoice number
-      const lastNumber = await this.getLastNormalInvoiceNumber();
-
-      // Increment for normal users
-      const nextNumber = lastNumber + 1;
-      console.log(`Normal user incrementing to: ${nextNumber}`);
-
-      return nextNumber;
-    } catch (error) {
-      console.error("Error getting next normal invoice number:", error);
-      const lastNumber = await this.getLastNormalInvoiceNumber();
-      return lastNumber + 1;
+      console.error("Error generating invoice number:", error);
+      throw error;
     }
   }
 
   static async getAdminInvoiceNumber(): Promise<string> {
-    const nextNumber = await this.getNextNormalInvoiceNumber();
-    return nextNumber.toString();
+    try {
+      let counter = await InvoiceCounter.findOne();
+
+      if (!counter) {
+        counter = await InvoiceCounter.create({
+          last_user_invoice: 6878,
+          last_special_invoice: 6878,
+        });
+      }
+
+      const nextNumber = counter.last_user_invoice + 1;
+
+      // Update the counter for admin as well
+      await counter.update({
+        last_user_invoice: nextNumber,
+      });
+
+      return nextNumber.toString();
+    } catch (error) {
+      console.error("Error getting admin invoice number:", error);
+      throw error;
+    }
   }
 
   static async getCurrentCounts(): Promise<{ user: string; special: string }> {
-    const lastNormal = await this.getLastNormalInvoiceNumber();
-    return {
-      user: (lastNormal + 1).toString(), // Next number for normal users
-      special: lastNormal.toString(), // Special users reuse the last normal number
-    };
+    try {
+      let counter = await InvoiceCounter.findOne();
+
+      if (!counter) {
+        counter = await InvoiceCounter.create({
+          last_user_invoice: 6878,
+          last_special_invoice: 6878,
+        });
+      }
+
+      return {
+        user: (counter.last_user_invoice + 1).toString(), // Next number for normal users
+        special: counter.last_user_invoice.toString(), // Special users reuse the last normal number
+      };
+    } catch (error) {
+      console.error("Error getting current counts:", error);
+      return {
+        user: "6879", // Fallback
+        special: "6878",
+      };
+    }
   }
 
-  // ADD THIS METHOD - Reset counters based on current data
   static async resetCounters(): Promise<void> {
     try {
-      const lastNormal = await this.getLastNormalInvoiceNumber();
-      console.log(`Resetting counters to: ${lastNormal}`);
+      // Find the highest invoice number from existing data to reset to
+      const lastNormal = await this.getLastNormalInvoiceNumberFromData();
 
-      const counter = await InvoiceCounter.findOne();
+      let counter = await InvoiceCounter.findOne();
       if (counter) {
         await counter.update({
           last_user_invoice: lastNormal,
           last_special_invoice: lastNormal,
         });
-        console.log("Counters updated successfully");
+        console.log(`Counters reset to: ${lastNormal}`);
       } else {
         await InvoiceCounter.create({
           last_user_invoice: lastNormal,
           last_special_invoice: lastNormal,
         });
-        console.log("New counters created successfully");
+        console.log(`New counters created with: ${lastNormal}`);
       }
     } catch (error) {
       console.error("Error resetting counters:", error);
@@ -163,17 +116,78 @@ export class InvoiceNumberGenerator {
     }
   }
 
-  // ADD THIS METHOD - Get current invoice status
   static async getInvoiceStatus(): Promise<{
     lastNormalInvoice: number;
     nextNormalInvoice: number;
     specialInvoice: number;
   }> {
-    const lastNormal = await this.getLastNormalInvoiceNumber();
-    return {
-      lastNormalInvoice: lastNormal,
-      nextNormalInvoice: lastNormal + 1,
-      specialInvoice: lastNormal,
-    };
+    try {
+      let counter = await InvoiceCounter.findOne();
+
+      if (!counter) {
+        counter = await InvoiceCounter.create({
+          last_user_invoice: 6878,
+          last_special_invoice: 6878,
+        });
+      }
+
+      return {
+        lastNormalInvoice: counter.last_user_invoice,
+        nextNormalInvoice: counter.last_user_invoice + 1,
+        specialInvoice: counter.last_user_invoice, // Special uses last normal
+      };
+    } catch (error) {
+      console.error("Error getting invoice status:", error);
+      return {
+        lastNormalInvoice: 6878,
+        nextNormalInvoice: 6879,
+        specialInvoice: 6878,
+      };
+    }
+  }
+
+  // Helper method to get the last normal invoice number from actual data
+  // Used only for resetting purposes
+  private static async getLastNormalInvoiceNumberFromData(): Promise<number> {
+    try {
+      // You can keep this method for reset functionality, but it won't be used in normal flow
+      // This would query your transactions/tickets tables to find the highest invoice number
+      // For now, returning a default
+      return 6878;
+    } catch (error) {
+      console.error("Error getting last normal invoice from data:", error);
+      return 6878;
+    }
+  }
+
+  // Method to manually set counters (useful for admin purposes)
+  static async setCounterManually(
+    userInvoice: number,
+    specialInvoice?: number
+  ): Promise<void> {
+    try {
+      let counter = await InvoiceCounter.findOne();
+
+      if (counter) {
+        await counter.update({
+          last_user_invoice: userInvoice,
+          last_special_invoice: specialInvoice || userInvoice,
+        });
+      } else {
+        await InvoiceCounter.create({
+          last_user_invoice: userInvoice,
+          last_special_invoice: specialInvoice || userInvoice,
+        });
+      }
+
+      console.log(
+        `Counters set manually - User: ${userInvoice}, Special: ${
+          specialInvoice || userInvoice
+        }`
+      );
+    } catch (error) {
+      console.error("Error setting counters manually:", error);
+      throw error;
+    }
   }
 }

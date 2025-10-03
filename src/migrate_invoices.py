@@ -77,7 +77,7 @@ class ExcelToSQLMigrator:
             print(f"Found {len(new_counters)} NEW counters in Excel")
     
     def clean_invoice_number(self, invoice_no):
-        """Clean invoice number - remove 'Inv-' prefix and keep only numbers"""
+        """Clean invoice number - remove 'Inv-' prefix and remove leading zeros"""
         if pd.isna(invoice_no):
             return None
             
@@ -87,8 +87,11 @@ class ExcelToSQLMigrator:
         if invoice_str.lower().startswith('inv-'):
             invoice_str = invoice_str[4:]
         
-        # Extract only numbers
+        # Extract only numbers and remove leading zeros
         numbers = ''.join(filter(str.isdigit, invoice_str))
+        
+        # Remove leading zeros
+        numbers = numbers.lstrip('0')
         
         return numbers if numbers else None
     
@@ -156,6 +159,7 @@ class ExcelToSQLMigrator:
                 
                 # Skip row if essential data is missing
                 if not all([invoice_no, date, show_name, category, counter_name, adult_count is not None]):
+                    print(f"⚠️  Skipping row {index + 1} due to missing essential data")
                     continue
                 
                 # Get mappings - FORCE madhu counter to be created
@@ -302,7 +306,7 @@ INSERT INTO transactions (invoice_no, date, adult_count, child_count, category, 
         print(f"\n📊 Sample data:")
         if transactions:
             sample = transactions[0]
-            print(f"   Invoice: {sample['invoice_no']} (without 'Inv-' prefix)")
+            print(f"   Invoice: {sample['invoice_no']} (without 'Inv-' prefix and leading zeros)")
             print(f"   Counter ID: {sample['counter_id']} (Madhu counter)")
             print(f"   Adults: {sample['adult_count']}, Total: ₹{sample['total_paid']}")
         
