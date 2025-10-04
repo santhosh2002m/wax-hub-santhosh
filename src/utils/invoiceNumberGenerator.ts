@@ -13,27 +13,39 @@ export class InvoiceNumberGenerator {
       if (!counter) {
         // Initialize with default values if counter doesn't exist
         counter = await InvoiceCounter.create({
-          last_user_invoice: 6878, // Your current last number
+          last_user_invoice: 6878,
           last_special_invoice: 6878,
         });
         console.log("Created new invoice counter with default values");
       }
 
       if (isSpecial) {
-        // SPECIAL USER: Return the last normal user invoice number
-        const specialInvoice = counter.last_user_invoice.toString();
-        console.log(`Special user invoice: ${specialInvoice}`);
-        return specialInvoice;
+        // SPECIAL USER: Continue from last_special_invoice + 1
+        const nextSpecialNumber = counter.last_special_invoice + 1;
+
+        // Update the special counter to continue sequentially
+        await counter.update({
+          last_special_invoice: nextSpecialNumber,
+        });
+
+        console.log(
+          `Special user invoice: ${nextSpecialNumber} (continues from special counter)`
+        );
+        return nextSpecialNumber.toString();
       } else {
         // NORMAL USER: Increment and return
         const nextNumber = counter.last_user_invoice + 1;
 
-        // Update the counter
+        // Update the normal counter (this updates admin panel)
         await counter.update({
           last_user_invoice: nextNumber,
+          // When normal user creates ticket, sync special counter to match
+          last_special_invoice: nextNumber,
         });
 
-        console.log(`Normal user invoice: ${nextNumber}`);
+        console.log(
+          `Normal user invoice: ${nextNumber} (updated both counters)`
+        );
         return nextNumber.toString();
       }
     } catch (error) {
@@ -58,6 +70,7 @@ export class InvoiceNumberGenerator {
       // Update the counter for admin as well
       await counter.update({
         last_user_invoice: nextNumber,
+        last_special_invoice: nextNumber, // Also sync special counter
       });
 
       return nextNumber.toString();
@@ -80,13 +93,13 @@ export class InvoiceNumberGenerator {
 
       return {
         user: (counter.last_user_invoice + 1).toString(), // Next number for normal users
-        special: counter.last_user_invoice.toString(), // Special users reuse the last normal number
+        special: (counter.last_special_invoice + 1).toString(), // Next number for special users
       };
     } catch (error) {
       console.error("Error getting current counts:", error);
       return {
         user: "6879", // Fallback
-        special: "6878",
+        special: "6879",
       };
     }
   }
@@ -119,7 +132,8 @@ export class InvoiceNumberGenerator {
   static async getInvoiceStatus(): Promise<{
     lastNormalInvoice: number;
     nextNormalInvoice: number;
-    specialInvoice: number;
+    lastSpecialInvoice: number;
+    nextSpecialInvoice: number;
   }> {
     try {
       let counter = await InvoiceCounter.findOne();
@@ -134,14 +148,16 @@ export class InvoiceNumberGenerator {
       return {
         lastNormalInvoice: counter.last_user_invoice,
         nextNormalInvoice: counter.last_user_invoice + 1,
-        specialInvoice: counter.last_user_invoice, // Special uses last normal
+        lastSpecialInvoice: counter.last_special_invoice,
+        nextSpecialInvoice: counter.last_special_invoice + 1,
       };
     } catch (error) {
       console.error("Error getting invoice status:", error);
       return {
         lastNormalInvoice: 6878,
         nextNormalInvoice: 6879,
-        specialInvoice: 6878,
+        lastSpecialInvoice: 6878,
+        nextSpecialInvoice: 6879,
       };
     }
   }
@@ -188,6 +204,28 @@ export class InvoiceNumberGenerator {
     } catch (error) {
       console.error("Error setting counters manually:", error);
       throw error;
+    }
+  }
+
+  // NEW: Fix your current database state
+  static async fixCurrentState(): Promise<void> {
+    try {
+      let counter = await InvoiceCounter.findOne();
+
+      if (!counter) {
+        return;
+      }
+
+      // Sync special counter to match normal counter
+      await counter.update({
+        last_special_invoice: counter.last_user_invoice,
+      });
+
+      console.log(
+        `Fixed counters - Normal: ${counter.last_user_invoice}, Special: ${counter.last_user_invoice}`
+      );
+    } catch (error) {
+      console.error("Error fixing current state:", error);
     }
   }
 }
