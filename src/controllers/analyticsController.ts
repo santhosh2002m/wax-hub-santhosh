@@ -142,14 +142,34 @@ export const getTodayOverview = async (req: Request, res: Response) => {
       ...includeCounter,
     });
 
-    // For attractions, use the filter WITHOUT is_analytics to include ALL tickets
-    const attractions = (await Ticket.findAll({
+    // 🟢 GET REGULAR TICKETS ATTRACTIONS (EXISTING LOGIC - UNCHANGED)
+    const regularAttractions = (await Ticket.findAll({
       attributes: [[fn("SUM", col("price")), "total"], "show_name"],
       group: ["show_name"],
       where: attractionsWhereClause, // NO is_analytics filter - include ALL tickets
       ...includeCounter,
       raw: true,
     })) as unknown as AttractionResult[];
+
+    // 🆕 ADDED: GET SPECIAL TICKETS ATTRACTIONS (FIXED VERSION)
+    const specialAttractionsRaw = await SpecialTicket.findAll({
+      attributes: [[fn("SUM", col("final_amount")), "total"], "show_name"],
+      group: ["show_name"],
+      where: {
+        createdAt: { [Op.gte]: today, [Op.lte]: todayEnd },
+      },
+      raw: true,
+    });
+
+    // Manually add category after query (FIX for PostgreSQL)
+    const specialAttractions = specialAttractionsRaw.map((item: any) => ({
+      total: item.total,
+      show_name: item.show_name,
+      category: "Special", // ✅ Manually add category here
+    })) as unknown as AttractionResult[];
+
+    // 🟢 COMBINE BOTH ATTRACTIONS
+    const attractions = [...regularAttractions, ...specialAttractions];
 
     const hours = Array.from({ length: 24 }, (_, i) => {
       const hourDate = new Date(today);
@@ -179,7 +199,7 @@ export const getTodayOverview = async (req: Request, res: Response) => {
       activeVisitors,
       revenueGrowth: amountGrowth.toFixed(2),
       ticketGrowth: ticketGrowth.toFixed(2),
-      attractions, // This now includes ALL tickets (both admin and user)
+      attractions, // ✅ NOW INCLUDES BOTH REGULAR & SPECIAL TICKETS
       chartData,
     });
   } catch (error) {
@@ -187,7 +207,6 @@ export const getTodayOverview = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
 export const getLast7Days = async (req: Request, res: Response) => {
   try {
     const now = new Date();
