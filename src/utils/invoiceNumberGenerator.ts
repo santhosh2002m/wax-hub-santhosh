@@ -1,5 +1,5 @@
-// FILE: utils/invoiceNumberGenerator.ts
 import InvoiceCounter from "../models/InvoiceCounter";
+import sequelize from "../config/database";
 import { Op } from "sequelize";
 
 export class InvoiceNumberGenerator {
@@ -11,12 +11,57 @@ export class InvoiceNumberGenerator {
       let counter = await InvoiceCounter.findOne();
 
       if (!counter) {
-        // Initialize with default values if counter doesn't exist
         counter = await InvoiceCounter.create({
           last_user_invoice: 6878,
           last_special_invoice: 6878,
         });
         console.log("Created new invoice counter with default values");
+      }
+
+      // Check for reset date
+      const now = new Date();
+      if (
+        counter.reset_date &&
+        now >= counter.reset_date &&
+        !counter.has_reset_occurred
+      ) {
+        if (counter.current_year_prefix) {
+          const prefix = counter.current_year_prefix;
+          try {
+            // Retroactively update all old tickets to have the prefix
+            // This frees up the number sequence so the new tickets can start cleanly from 1 again.
+            await sequelize.query(`
+              UPDATE user_tickets 
+              SET invoice_no = CONCAT(:prefix, invoice_no) 
+              WHERE invoice_no NOT LIKE CONCAT(:prefix, '%')
+            `, { replacements: { prefix } });
+
+            await sequelize.query(`
+              UPDATE special_tickets 
+              SET invoice_no = CONCAT(:prefix, invoice_no) 
+              WHERE invoice_no NOT LIKE CONCAT(:prefix, '%')
+            `, { replacements: { prefix } });
+
+            await sequelize.query(`
+              UPDATE transactions 
+              SET invoice_no = CONCAT(:prefix, invoice_no) 
+              WHERE invoice_no NOT LIKE CONCAT(:prefix, '%')
+            `, { replacements: { prefix } });
+            
+            console.log(`Successfully prefixed all old tickets with ${prefix}`);
+          } catch (e) {
+            console.error("Failed to prefix old tickets", e);
+            throw e;
+          }
+        }
+
+        // Time to reset
+        await counter.update({
+          last_user_invoice: 0,
+          last_special_invoice: 0,
+          has_reset_occurred: true,
+        });
+        console.log(`Counters reset to 0 as we passed the reset date: ${counter.reset_date}`);
       }
 
       if (isSpecial) {
@@ -28,10 +73,12 @@ export class InvoiceNumberGenerator {
           last_special_invoice: nextSpecialNumber,
         });
 
+        const paddedNum = nextSpecialNumber.toString().padStart(2, "0");
+        const finalInvoice = `${paddedNum}`;
         console.log(
-          `Special user invoice: ${nextSpecialNumber} (continues from special counter)`
+          `Special user invoice: ${finalInvoice} (continues from special counter)`
         );
-        return nextSpecialNumber.toString();
+        return finalInvoice;
       } else {
         // NORMAL USER: Increment and return
         const nextNumber = counter.last_user_invoice + 1;
@@ -43,10 +90,12 @@ export class InvoiceNumberGenerator {
           last_special_invoice: nextNumber,
         });
 
+        const paddedNum = nextNumber.toString().padStart(2, "0");
+        const finalInvoice = `${paddedNum}`;
         console.log(
-          `Normal user invoice: ${nextNumber} (updated both counters)`
+          `Normal user invoice: ${finalInvoice} (updated both counters)`
         );
-        return nextNumber.toString();
+        return finalInvoice;
       }
     } catch (error) {
       console.error("Error generating invoice number:", error);
@@ -65,6 +114,21 @@ export class InvoiceNumberGenerator {
         });
       }
 
+      // Check for reset date
+      const now = new Date();
+      if (
+        counter.reset_date &&
+        now >= counter.reset_date &&
+        !counter.has_reset_occurred
+      ) {
+        // Time to reset
+        await counter.update({
+          last_user_invoice: 0,
+          last_special_invoice: 0,
+          has_reset_occurred: true,
+        });
+      }
+
       const nextNumber = counter.last_user_invoice + 1;
 
       // Update the counter for admin as well
@@ -73,7 +137,8 @@ export class InvoiceNumberGenerator {
         last_special_invoice: nextNumber, // Also sync special counter
       });
 
-      return nextNumber.toString();
+      const paddedNum = nextNumber.toString().padStart(2, "0");
+      return `${paddedNum}`;
     } catch (error) {
       console.error("Error getting admin invoice number:", error);
       throw error;
@@ -91,14 +156,17 @@ export class InvoiceNumberGenerator {
         });
       }
 
+      const paddedUser = (counter.last_user_invoice + 1).toString().padStart(2, "0");
+      const paddedSpecial = (counter.last_special_invoice + 1).toString().padStart(2, "0");
+
       return {
-        user: (counter.last_user_invoice + 1).toString(), // Next number for normal users
-        special: (counter.last_special_invoice + 1).toString(), // Next number for special users
+        user: `${paddedUser}`,
+        special: `${paddedSpecial}`,
       };
     } catch (error) {
       console.error("Error getting current counts:", error);
       return {
-        user: "6879", // Fallback
+        user: "6879",
         special: "6879",
       };
     }

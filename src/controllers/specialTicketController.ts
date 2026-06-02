@@ -52,7 +52,7 @@ export const createSpecialTicket = async (req: Request, res: Response) => {
         const invoiceNumber = await InvoiceNumberGenerator.getNextInvoiceNumber(
           true
         );
-        const invoice_no = invoiceNumber.toString().padStart(2, "0");
+        const invoice_no = invoiceNumber;
 
         const ticketData: any = {
           ...req.body,

@@ -143,7 +143,7 @@ export const createUserTicket = async (req: Request, res: Response) => {
     const invoiceNumber = await InvoiceNumberGenerator.getNextInvoiceNumber(
       false
     );
-    const invoice_no = invoiceNumber.toString().padStart(2, "0"); // 2-digit format
+    const invoice_no = invoiceNumber; // Generator handles padding and prefixing
 
     // Set default values for optional fields
     const ticketData = {
