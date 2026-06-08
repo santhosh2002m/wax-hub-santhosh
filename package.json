@@ -7,6 +7,7 @@
     "build": "tsc",
     "postbuild": "node dist/scripts/seed-system-users.js",
     "seed:system": "ts-node src/scripts/seed-system-users.ts",
+    "migrate:prod": "node dist/migrations/run-migrations.js",
     "start": "node dist/app.js",
     "setup": "ts-node src/scripts/setup.ts",
     "migrate": "ts-node src/migrations/run-migrations.ts",

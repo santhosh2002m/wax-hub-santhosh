@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import sequelize from "../config/database";
 import Counter from "../models/counterModel";
+import { ensureProductionSchema } from "../utils/ensureProductionSchema";
 
 dotenv.config();
 
@@ -41,6 +42,8 @@ async function seedSystemUsers() {
   try {
     await sequelize.authenticate();
     console.log("Database connected for system user seeding");
+
+    await ensureProductionSchema();
 
     let seeded = 0;
     let skipped = 0;

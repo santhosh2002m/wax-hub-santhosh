@@ -13,9 +13,9 @@ const runMigrations = async () => {
     const files = readdirSync(migrationsPath)
       .filter(
         (f) =>
-          f.endsWith(".ts") &&
-          f !== "run-migrations.ts" &&
-          f !== "rollbackMigration.ts"
+          (f.endsWith(".ts") || f.endsWith(".js")) &&
+          !f.startsWith("run-migrations") &&
+          !f.startsWith("rollbackMigration")
       )
       .sort();
 
