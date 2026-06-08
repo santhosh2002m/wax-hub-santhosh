@@ -15,7 +15,7 @@ import userTicketRoutes from "./routes/userTicketRoutes";
 import userGuideRoutes from "./routes/userGuideRoutes";
 import specialTicketRoutes from "./routes/specialTicketRoutes";
 import userAuthRoutes from "./routes/userAuthRoutes";
-import { createSpecialCounter } from "./controllers/counterController";
+import commissionRoutes from "./routes/commissionRoutes";
 import twilioRoutes from "./routes/twilioRoutes";
 import invoiceRoutes from "./routes/invoiceRoutes";
 import settingsRoutes from "./routes/settingsRoutes";
@@ -66,6 +66,7 @@ app.use("/api/invoice", invoiceRoutes);
 app.use("/api/user/auth", userAuthRoutes);
 app.use("/api/twilio", twilioRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/commission", commissionRoutes);
 
 // Health check
 app.get("/health", (req, res) => {
@@ -77,7 +78,6 @@ sequelize
   .sync({ alter: true })
   .then(async () => {
     console.log("✅ Database synced");
-    await createSpecialCounter();
     scheduleDailyCleanup();
 
     setTimeout(async () => {

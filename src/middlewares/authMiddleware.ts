@@ -156,3 +156,15 @@ export const authorizeSpecialCounter = (
     .status(403)
     .json({ message: "Special counter or admin access required" });
 };
+
+export const authorizeCommission = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const user = (req as any).user as AuthenticatedUser;
+  if (user.role === "commission") {
+    return next();
+  }
+  return res.status(403).json({ message: "Commission access required" });
+};

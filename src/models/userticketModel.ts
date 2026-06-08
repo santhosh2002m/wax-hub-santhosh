@@ -16,8 +16,10 @@ interface UserTicketAttributes {
   tax: number;
   final_amount: number;
   status: "pending" | "completed" | "cancelled";
+  commission_paid: boolean;
+  commission_paid_at?: Date | null;
   user_id: number;
-  counter_id?: number; // Add optional counter_id
+  counter_id?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -25,7 +27,7 @@ interface UserTicketAttributes {
 export interface UserTicketCreationAttributes
   extends Optional<
     UserTicketAttributes,
-    "id" | "createdAt" | "updatedAt" | "status" | "counter_id"
+    "id" | "createdAt" | "updatedAt" | "status" | "counter_id" | "commission_paid" | "commission_paid_at"
   > {}
 
 export class UserTicket
@@ -44,6 +46,8 @@ export class UserTicket
   public tax!: number;
   public final_amount!: number;
   public status!: "pending" | "completed" | "cancelled";
+  public commission_paid!: boolean;
+  public commission_paid_at?: Date | null;
   public user_id!: number;
   public counter_id?: number;
   public readonly createdAt!: Date;
@@ -68,6 +72,12 @@ UserTicket.init(
       defaultValue: "pending",
       allowNull: false,
     },
+    commission_paid: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
+    commission_paid_at: { type: DataTypes.DATE, allowNull: true },
     user_id: { type: DataTypes.INTEGER, allowNull: false },
     counter_id: { type: DataTypes.INTEGER, allowNull: true },
     createdAt: { type: DataTypes.DATE, allowNull: false },

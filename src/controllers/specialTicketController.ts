@@ -6,6 +6,10 @@ import Ticket from "../models/ticketModel";
 import Transaction from "../models/transactionModel";
 import Counter from "../models/counterModel";
 import { InvoiceNumberGenerator } from "../utils/invoiceNumberGenerator";
+import {
+  buildGuideUidLookup,
+  resolveGuideUid,
+} from "../utils/resolveGuideUid";
 
 interface AuthenticatedUser {
   id: number;
@@ -184,7 +188,28 @@ export const getSpecialTickets = async (req: Request, res: Response) => {
       ];
     }
 
-    // Different query based on whether we want all tickets or paginated
+    const guideLookup = await buildGuideUidLookup();
+    const mapTicket = (ticket: SpecialTicket) => ({
+      id: ticket.id,
+      invoice_no: ticket.invoice_no,
+      guide_uid: resolveGuideUid(
+        guideLookup,
+        ticket.guide_name,
+        ticket.guide_number
+      ),
+      vehicle_type: ticket.vehicle_type,
+      guide_name: ticket.guide_name,
+      guide_number: ticket.guide_number,
+      show_name: ticket.show_name,
+      adults: ticket.adults,
+      ticket_price: ticket.ticket_price,
+      total_price: ticket.total_price,
+      tax: ticket.tax,
+      final_amount: ticket.final_amount,
+      status: ticket.status,
+      createdAt: ticket.createdAt,
+    });
+
     let result;
     if (shouldShowAll) {
       const tickets = await SpecialTicket.findAll({
@@ -193,21 +218,7 @@ export const getSpecialTickets = async (req: Request, res: Response) => {
       });
 
       result = {
-        tickets: tickets.map((ticket) => ({
-          id: ticket.id,
-          invoice_no: ticket.invoice_no,
-          vehicle_type: ticket.vehicle_type,
-          guide_name: ticket.guide_name,
-          guide_number: ticket.guide_number,
-          show_name: ticket.show_name,
-          adults: ticket.adults,
-          ticket_price: ticket.ticket_price,
-          total_price: ticket.total_price,
-          tax: ticket.tax,
-          final_amount: ticket.final_amount,
-          status: ticket.status,
-          createdAt: ticket.createdAt,
-        })),
+        tickets: tickets.map(mapTicket),
         total: tickets.length,
         page: 1,
         pages: 1,
@@ -221,21 +232,7 @@ export const getSpecialTickets = async (req: Request, res: Response) => {
       });
 
       result = {
-        tickets: tickets.map((ticket) => ({
-          id: ticket.id,
-          invoice_no: ticket.invoice_no,
-          vehicle_type: ticket.vehicle_type,
-          guide_name: ticket.guide_name,
-          guide_number: ticket.guide_number,
-          show_name: ticket.show_name,
-          adults: ticket.adults,
-          ticket_price: ticket.ticket_price,
-          total_price: ticket.total_price,
-          tax: ticket.tax,
-          final_amount: ticket.final_amount,
-          status: ticket.status,
-          createdAt: ticket.createdAt,
-        })),
+        tickets: tickets.map(mapTicket),
         total: count,
         page: pageNum,
         pages: Math.ceil(count / (limitNum as number)),

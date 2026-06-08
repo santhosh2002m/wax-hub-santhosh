@@ -5,6 +5,21 @@ import {
   userGuideUpdateSchema,
 } from "../schemas/userGuideSchema";
 import { Op } from "sequelize";
+import { getNextGuideUid } from "../utils/generateGuideUid";
+
+const formatGuide = (guide: UserGuide) => ({
+  id: guide.id,
+  uid: guide.uid,
+  name: guide.name,
+  number: guide.number,
+  vehicle_type: guide.vehicle_type,
+  score: guide.score,
+  total_bookings: guide.total_bookings,
+  rating: guide.rating,
+  status: guide.status,
+  created_at: guide.created_at,
+  updated_at: guide.updated_at,
+});
 
 export const getUserGuides = async (req: Request, res: Response) => {
   try {
@@ -32,17 +47,7 @@ export const getUserGuides = async (req: Request, res: Response) => {
     });
 
     res.json({
-      guides: guides.map((guide) => ({
-        id: guide.id,
-        name: guide.name,
-        number: guide.number,
-        vehicle_type: guide.vehicle_type,
-        score: guide.score,
-        total_bookings: guide.total_bookings,
-        rating: guide.rating,
-        status: guide.status,
-        created_at: guide.created_at,
-      })),
+      guides: guides.map(formatGuide),
       total: guides.length,
     });
   } catch (error) {
@@ -60,17 +65,7 @@ export const getUserGuide = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Guide not found" });
     }
 
-    res.json({
-      id: guide.id,
-      name: guide.name,
-      number: guide.number,
-      vehicle_type: guide.vehicle_type,
-      score: guide.score,
-      total_bookings: guide.total_bookings,
-      rating: guide.rating,
-      status: guide.status,
-      created_at: guide.created_at,
-    });
+    res.json(formatGuide(guide));
   } catch (error) {
     console.error("Error in get user guide:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -101,7 +96,10 @@ export const createUserGuide = async (req: Request, res: Response) => {
         .json({ message: "Guide with this number already exists" });
     }
 
+    const uid = await getNextGuideUid();
+
     const guide = await UserGuide.create({
+      uid,
       name,
       number,
       vehicle_type,
@@ -109,23 +107,13 @@ export const createUserGuide = async (req: Request, res: Response) => {
       total_bookings: total_bookings || 0,
       rating: rating || 0.0,
       status: status || "active",
-      created_at: new Date(), // Explicitly set created_at
-      updated_at: new Date(), // Explicitly set updated_at
+      created_at: new Date(),
+      updated_at: new Date(),
     });
 
     res.status(201).json({
       message: "Guide created successfully",
-      guide: {
-        id: guide.id,
-        name: guide.name,
-        number: guide.number,
-        vehicle_type: guide.vehicle_type,
-        score: guide.score,
-        total_bookings: guide.total_bookings,
-        rating: guide.rating,
-        status: guide.status,
-        created_at: guide.created_at,
-      },
+      guide: formatGuide(guide),
     });
   } catch (error) {
     console.error("Error in create user guide:", error);
@@ -159,17 +147,7 @@ export const updateUserGuide = async (req: Request, res: Response) => {
     await guide.update(req.body);
     res.json({
       message: "Guide updated successfully",
-      guide: {
-        id: guide.id,
-        name: guide.name,
-        number: guide.number,
-        vehicle_type: guide.vehicle_type,
-        score: guide.score,
-        total_bookings: guide.total_bookings,
-        rating: guide.rating,
-        status: guide.status,
-        updated_at: guide.updated_at,
-      },
+      guide: formatGuide(guide),
     });
   } catch (error) {
     console.error("Error in update user guide:", error);
@@ -204,13 +182,7 @@ export const getTopPerformers = async (req: Request, res: Response) => {
 
     res.json({
       top_performers: topPerformers.map((guide) => ({
-        id: guide.id,
-        name: guide.name,
-        number: guide.number,
-        vehicle_type: guide.vehicle_type,
-        score: guide.score,
-        total_bookings: guide.total_bookings,
-        rating: guide.rating,
+        ...formatGuide(guide),
         rank: topPerformers.indexOf(guide) + 1,
       })),
     });

@@ -19,11 +19,12 @@ export const addCounter = async (req: Request, res: Response) => {
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
+    const resolvedRole = role || "manager";
     const counter = await Counter.create({
       username,
       password: hashedPassword,
-      role: role || "manager",
-      special: special || false,
+      role: resolvedRole,
+      special: resolvedRole === "commission" ? false : special || false,
     });
     res.status(201).json({
       id: counter.id,
@@ -92,19 +93,22 @@ export const registerAdmin = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Username already exists" });
     }
 
-    const validRoles = ["admin", "manager", "user"];
+    const validRoles = ["admin", "manager", "user", "commission"];
     if (role && !validRoles.includes(role)) {
       return res
         .status(400)
-        .json({ message: "Role must be 'admin', 'manager', or 'user'" });
+        .json({
+          message: "Role must be 'admin', 'manager', 'user', or 'commission'",
+        });
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
+    const resolvedRole = role || "manager";
     const counter = await Counter.create({
       username,
       password: hashedPassword,
-      role: role || "manager",
-      special: special || false,
+      role: resolvedRole,
+      special: resolvedRole === "commission" ? false : special || false,
     });
 
     res.status(201).json({
@@ -155,23 +159,3 @@ export const changePassword = async (req: Request, res: Response) => {
   }
 };
 
-// FILE: controllers/counterController.ts
-export const createSpecialCounter = async () => {
-  try {
-    const username = "special_counter";
-    const password = "SpecialPass123!";
-    const existingCounter = await Counter.findOne({ where: { username } });
-    if (!existingCounter) {
-      const hashedPassword = bcrypt.hashSync(password, 10);
-      await Counter.create({
-        username,
-        password: hashedPassword,
-        role: "manager", // Changed from "user" to "manager"
-        special: true,
-      });
-      console.log("Special counter created with username: special_counter");
-    }
-  } catch (error) {
-    console.error("Error creating special counter:", error);
-  }
-};

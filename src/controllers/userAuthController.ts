@@ -73,7 +73,29 @@ export const userLogin = async (req: Request, res: Response) => {
       });
     }
 
-    // If neither regular user nor special user
+    if (counter.role === "commission" && !counter.special) {
+      const token = jwt.sign(
+        {
+          id: counter.id,
+          username,
+          role: counter.role,
+          special: false,
+          userType: "commission",
+        },
+        process.env.JWT_SECRET as string,
+        { expiresIn: "8h" }
+      );
+
+      return res.status(200).json({
+        token,
+        username: counter.username,
+        role: counter.role,
+        special: false,
+        userType: "commission",
+        createdAt: counter.createdAt,
+      });
+    }
+
     return res
       .status(401)
       .json({ message: "Invalid credentials for user dashboard" });

@@ -7,6 +7,11 @@ import Transaction from "../models/transactionModel";
 import Counter from "../models/counterModel";
 import UserGuide from "../models/userGuideModel";
 import { InvoiceNumberGenerator } from "../utils/invoiceNumberGenerator";
+import { getNextGuideUid } from "../utils/generateGuideUid";
+import {
+  buildGuideUidLookup,
+  resolveGuideUid,
+} from "../utils/resolveGuideUid";
 
 interface AuthenticatedUser {
   id: number;
@@ -57,8 +62,10 @@ const updateGuideStats = async (
     if (!guide) {
       console.log(`Creating new guide: "${normalizedGuideName}"`);
       // Create a new guide if it doesn't exist
+      const uid = await getNextGuideUid(transaction);
       guide = await UserGuide.create(
         {
+          uid,
           name: normalizedGuideName,
           number: normalizedGuideNumber,
           vehicle_type: normalizedVehicleType,
@@ -321,10 +328,17 @@ export const getUserTickets = async (req: Request, res: Response) => {
       offset,
     });
 
+    const guideLookup = await buildGuideUidLookup();
+
     res.json({
       tickets: tickets.map((ticket) => ({
         id: ticket.id,
         invoice_no: ticket.invoice_no,
+        guide_uid: resolveGuideUid(
+          guideLookup,
+          ticket.guide_name,
+          ticket.guide_number
+        ),
         vehicle_type: ticket.vehicle_type,
         guide_name: ticket.guide_name,
         guide_number: ticket.guide_number,

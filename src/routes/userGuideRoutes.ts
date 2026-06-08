@@ -18,7 +18,7 @@ const router = express.Router();
 router.get("/", authenticateJWT, authorizeForGuides, getUserGuides);
 router.get("/top", authenticateJWT, authorizeForGuides, getTopPerformers);
 router.get("/:id", authenticateJWT, authorizeForGuides, getUserGuide);
-router.post("/", authenticateJWT, authorizeAdmin, createUserGuide);
+router.post("/", authenticateJWT, authorizeForGuides, createUserGuide);
 router.put("/:id", authenticateJWT, authorizeAdmin, updateUserGuide);
 router.delete("/:id", authenticateJWT, authorizeAdmin, deleteUserGuide);
 

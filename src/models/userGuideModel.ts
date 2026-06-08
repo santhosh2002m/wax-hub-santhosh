@@ -3,6 +3,7 @@ import sequelize from "../config/database";
 
 interface UserGuideAttributes {
   id: number;
+  uid: string;
   name: string;
   number: string;
   vehicle_type: string;
@@ -31,6 +32,7 @@ class UserGuide
   implements UserGuideAttributes
 {
   public id!: number;
+  public uid!: string;
   public name!: string;
   public number!: string;
   public vehicle_type!: string;
@@ -45,6 +47,11 @@ class UserGuide
 UserGuide.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    uid: {
+      type: DataTypes.STRING(10),
+      allowNull: false,
+      unique: true,
+    },
     name: {
       type: DataTypes.STRING,
       allowNull: false,

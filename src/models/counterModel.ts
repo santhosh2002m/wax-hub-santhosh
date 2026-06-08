@@ -6,7 +6,7 @@ interface CounterAttributes {
   id: number;
   username: string;
   password: string;
-  role: "manager" | "admin" | "user"; // Added "user" role
+  role: "manager" | "admin" | "user" | "commission";
   special: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -25,7 +25,7 @@ class Counter
   public id!: number;
   public username!: string;
   public password!: string;
-  public role!: "manager" | "admin" | "user"; // Updated role type
+  public role!: "manager" | "admin" | "user" | "commission";
   public special!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -37,7 +37,7 @@ Counter.init(
     username: { type: DataTypes.STRING(50), unique: true, allowNull: false },
     password: { type: DataTypes.STRING(255), allowNull: false },
     role: {
-      type: DataTypes.ENUM("manager", "admin", "user"), // Updated ENUM
+      type: DataTypes.ENUM("manager", "admin", "user", "commission"),
       defaultValue: "manager",
       allowNull: false,
     },

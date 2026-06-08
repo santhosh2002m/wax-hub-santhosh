@@ -16,6 +16,8 @@ interface SpecialTicketAttributes {
   tax: number;
   final_amount: number;
   status: "pending" | "completed" | "cancelled";
+  commission_paid: boolean;
+  commission_paid_at?: Date | null;
   counter_id: number;
   createdAt?: Date;
   updatedAt?: Date;
@@ -24,7 +26,7 @@ interface SpecialTicketAttributes {
 export interface SpecialTicketCreationAttributes
   extends Optional<
     SpecialTicketAttributes,
-    "id" | "createdAt" | "updatedAt" | "status"
+    "id" | "createdAt" | "updatedAt" | "status" | "commission_paid" | "commission_paid_at"
   > {}
 
 // Add this interface for the associations
@@ -49,6 +51,8 @@ export class SpecialTicket
   public tax!: number;
   public final_amount!: number;
   public status!: "pending" | "completed" | "cancelled";
+  public commission_paid!: boolean;
+  public commission_paid_at?: Date | null;
   public counter_id!: number;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -85,6 +89,12 @@ SpecialTicket.init(
       defaultValue: "pending",
       allowNull: false,
     },
+    commission_paid: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
+    commission_paid_at: { type: DataTypes.DATE, allowNull: true },
     counter_id: { type: DataTypes.INTEGER, allowNull: false },
     createdAt: { type: DataTypes.DATE, allowNull: false },
     updatedAt: { type: DataTypes.DATE, allowNull: false },
