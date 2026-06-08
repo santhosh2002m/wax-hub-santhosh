@@ -40,10 +40,9 @@ const systemUsers: SystemUserConfig[] = [
 
 async function seedSystemUsers() {
   try {
-    await sequelize.authenticate();
-    console.log("Database connected for system user seeding");
-
+    console.log("Starting system user seeding");
     await ensureProductionSchema();
+    console.log("Database connected for system user seeding");
 
     let seeded = 0;
     let skipped = 0;
