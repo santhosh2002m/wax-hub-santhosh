@@ -8,6 +8,7 @@
     "postbuild": "node dist/scripts/seed-system-users.js",
     "seed:system": "ts-node src/scripts/seed-system-users.ts",
     "fix:commission": "node dist/scripts/fix-commission-enum.js",
+    "fix:guide-uids": "node dist/scripts/backfill-guide-uids.js",
     "migrate:prod": "node dist/migrations/run-migrations.js",
     "start": "node dist/app.js",
     "setup": "ts-node src/scripts/setup.ts",

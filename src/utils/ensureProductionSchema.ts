@@ -1,6 +1,7 @@
 import { Sequelize } from "sequelize";
 import dotenv from "dotenv";
 import sequelize from "../config/database";
+import { backfillGuideUids } from "./backfillGuideUids";
 
 dotenv.config();
 
@@ -112,5 +113,11 @@ export async function ensureProductionSchema() {
   await ensureCommissionRole();
   await sequelize.authenticate();
   await ensureColumns();
+
+  const filled = await backfillGuideUids();
+  if (filled > 0) {
+    console.log(`Backfilled UIDs for ${filled} guide(s)`);
+  }
+
   console.log("Production schema checks completed");
 }
